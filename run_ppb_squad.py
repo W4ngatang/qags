@@ -132,7 +132,12 @@ def main():
     parser.add_argument('--server_ip', type=str, default='', help="Can be used for distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="Can be used for distant debugging.")
     args = parser.parse_args()
-    print(args)
+
+    log_fh = logging.FileHandler(os.path.join(args.output_dir, "log.log"))
+    log_fmt = logging.Formatter("%(asctime)s: %(message)s", datefmt="%m/%d %I:%M:%S %p")
+    log_fh.setFormatter(log_fmt)
+    logging.getLogger().addHandler(log_fh)
+    logging.info(args)
 
     if args.server_ip and args.server_port:
         # Distant debugging - see https://code.visualstudio.com/docs/python/debugging#_attach-to-a-local-script
@@ -151,9 +156,9 @@ def main():
         # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
         torch.distributed.init_process_group(backend='nccl')
 
-    logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-                        datefmt = '%m/%d/%Y %H:%M:%S',
-                        level = logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
+    #logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+    #                    datefmt = '%m/%d/%Y %H:%M:%S',
+    #                    level = logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
 
     logger.info("device: {} n_gpu: {}, distributed training: {}, 16-bits training: {}".format(
         device, n_gpu, bool(args.local_rank != -1), args.fp16))
