@@ -2,13 +2,24 @@
 
 import re
 import json
+import random
 from collections import defaultdict
+
+import ipdb
 
 def filter_line(line):
     """ Detect if actually a line that we care about """
     return re.match(r'(S|T|H|P)-[0-9]+\t', line) is None
 
-def parse_generation(data_file, out_file):
+def write_jsonl(data, out_file):
+    with open(out_file, 'w', encoding='utf-8') as out_fh:
+        for datum_idx, datum in data.items():
+            out_fh.write(f"{json.dumps({datum_idx: datum})}\n")
+
+def process(text):
+    return text.replace("[CLS]", "").strip()
+
+def parse_generation(data_file):
     with open(data_file, encoding='utf-8') as data_fh:
         all_lines = data_fh.readlines()
 
@@ -27,25 +38,55 @@ def parse_generation(data_file, out_file):
         assert line_t in ['S', 'T', 'H', 'P']
         if line_t in ['S', 'T']:
             assert len(line) == 2
-            text = line[1].strip()
+            text = process(line[1])# .strip()
             key = 'source' if line_t == 'S' else 'target'
             data[ex_idx][key] = text
         elif line_t == 'H':
             assert len(line) == 3
             score = float(line[1])
-            text = line[2].strip()
+            text = process(line[2]) #.strip()
             data[ex_idx]["hypotheses"].append((text, score))
         else: # probabilities
             continue
 
-    with open(out_file, 'w', encoding='utf-8') as out_fh:
-        for datum_idx, datum in data.items():
-            out_fh.write(f"{json.dumps({datum_idx: datum})}\n")
+    return data
 
-data_file = "/checkpoint/wangalexc/fairseq/06-17-2019/summaries.out"
-out_file = "/private/home/wangalexc/projects/qags/data/summaries.jsonl"
-parse_generation(data_file, out_file)
+def format_squad(raw_data, context="source"):
+    """ """
+    assert context in ["source", "target"]
+    qa_idx = 0
+    data = []
+    for datum_idx, raw in raw_data.items():
+        datum = {}
+        datum["context"] = raw[context]
+
+        #dummy_title = random.choice(raw[context].split())
+        dummy_title = " ".join(raw[context].split()[:5])
+
+        qas = []
+        for raw_qa in raw["hypotheses"]:
+            qa = {"question": raw_qa[0],
+                  "answers": [],
+                  "id": qa_idx
+                 }
+            qa_idx += 1
+            qas.append(qa)
+        datum["qas"] = qas
+        data.append({"paragraph": [datum],
+                     "title": dummy_title,
+                    })
+
+    return {"data": data}
+
+#data_file = "/checkpoint/wangalexc/fairseq/06-17-2019/summaries.out"
+#out_file = "/private/home/wangalexc/projects/qags/data/summaries.jsonl"
+#data = parse_generation(data_file, out_file)
+#write_jsonl(data, out_file)
 
 data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.out"
 out_file = "/private/home/wangalexc/projects/qags/data/questions.jsonl"
-parse_generation(data_file, out_file)
+data = parse_generation(data_file)
+#write_jsonl(data, out_file)
+data = format_squad(data, "source")
+
+ipdb.set_trace()
