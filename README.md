@@ -7,3 +7,12 @@ This repo includes:
 - `parse_fseq.py`: Parse fairseq output "logs" for the actual generations, outputting a JSONL containing the generations. Usage: 
 - `allennlp_qa.py`: use AllenNLP pretrained QA models to evaluate questions and summaries. Usage: `python allennlp_qa.py 2>&1 | tee data/bidaf.log`
 - `eval_answers.py`: Evaluate answer spans outputted by `allennlp_qa.py`. Usage: 
+
+## Question Generation Models
+
+- fairseq
+
+## Question Answering Models
+
+- BiDAF: `allennlp_qa.py`
+- BERT: `scripts/qa_bbp.sh`; based of pytorch-pretrained-BERT
