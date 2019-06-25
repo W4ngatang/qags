@@ -7,6 +7,8 @@ from collections import defaultdict
 
 import ipdb
 
+N_SAMPLES = 5
+
 def filter_line(line):
     """ Detect if actually a line that we care about """
     return re.match(r'(S|T|H|P)-[0-9]+\t', line) is None
@@ -18,6 +20,14 @@ def write_jsonl(data, out_file):
 
 def process(text):
     return text.replace("[CLS]", "").strip()
+
+def print_samples(data, n_samples=5):
+    samples = random.sample(list(data.values()), n_samples)
+    for sample in samples:
+        print(f"Source: {sample['source']}")
+        sample["hypotheses"].sort(key=lambda x: x[1], reverse=True)
+        for hyp in sample["hypotheses"]:
+            print(f"\tHyp: {hyp[0]}")
 
 def parse_generation(data_file):
     with open(data_file, encoding='utf-8') as data_fh:
@@ -83,10 +93,15 @@ def format_squad(raw_data, context="source"):
 #data = parse_generation(data_file, out_file)
 #write_jsonl(data, out_file)
 
-data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.out"
-out_file = "/private/home/wangalexc/projects/qags/data/questions.jsonl"
-data = parse_generation(data_file)
+#data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.out"
+#out_file = "/private/home/wangalexc/projects/qags/data/questions.jsonl"
+#data = parse_generation(data_file)
 #write_jsonl(data, out_file)
-data = format_squad(data, "source")
+#data = format_squad(data, "source")
 
-ipdb.set_trace()
+data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.sampling.out"
+out_file = "/private/home/wangalexc/projects/qags/data/questions.sampling.jsonl"
+data = parse_generation(data_file)
+print_samples(data, n_samples=N_SAMPLES)
+write_jsonl(data, out_file)
+
