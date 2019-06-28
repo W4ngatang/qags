@@ -62,6 +62,8 @@ def main():
                         "bert-base-multilingual-cased, bert-base-chinese.")
     parser.add_argument("--output_dir", default=None, type=str, required=True,
                         help="The output directory where the model checkpoints and predictions will be written.")
+    parser.add_argument("--load_model_from_dir", default=None, type=str, required=True,
+                        help="Directory from which to load a model checkpoint.")
 
     ## Other parameters
     parser.add_argument("--train_file", default=None, type=str, help="SQuAD json for training. E.g., train-v1.1.json")
@@ -347,6 +349,12 @@ def main():
     else:
         model = BertForQuestionAnswering.from_pretrained(args.bert_model)
 
+    # Allow for model loading, even if we didn't train it in this run.
+    if not args.do_train and args.load_model_from_dir is not None:
+        logger.info(f"Skipping training. Loading model from {args.load_model_from_dir}")
+        # Load a trained model and vocabulary that you have fine-tuned
+        model = BertForQuestionAnswering.from_pretrained(args.load_model_from_dir)
+        tokenizer = BertTokenizer.from_pretrained(args.load_model_from_dir, do_lower_case=args.do_lower_case)
     model.to(device)
 
     if args.do_predict and (args.local_rank == -1 or torch.distributed.get_rank() == 0):

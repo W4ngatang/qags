@@ -119,10 +119,12 @@ def write_ans(data, out_file):
             out_fh.write(f"{json.dumps(d)}\n")
 
 gen_file = "data/summaries.jsonl"
-qst_file = "data/questions.jsonl"
 model_name = "bidaf"
-out_file = f"data/{model_name}_outs.jsonl"
+out_file = f"data/{model_name}.cnndm-tgt-qs.preds.jsonl"
 gpu_id = 0
+
+#qst_file = "data/questions.cnndm-sources.jsonl"
+qst_file = "data/questions.cnndm-targets.jsonl"
 
 data = load_data(gen_file, qst_file)
 data_w_ans = eval(model_name, data, gpu_id)

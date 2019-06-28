@@ -18,6 +18,12 @@ def write_jsonl(data, out_file):
         for datum_idx, datum in data.items():
             out_fh.write(f"{json.dumps({datum_idx: datum})}\n")
 
+def write_text(data, out_file):
+    """ Write out an iterable of sentences """
+    with open(out_file, 'w', encoding='utf-8') as out_fh:
+        for datum in data:
+            out_fh.write(f"{datum}\n")
+
 def process(text):
     return text.replace("[CLS]", "").strip()
 
@@ -47,8 +53,7 @@ def parse_generation(data_file):
 
         assert line_t in ['S', 'T', 'H', 'P']
         if line_t in ['S', 'T']:
-            assert len(line) == 2
-            text = process(line[1])# .strip()
+            assert len(line) == 2 text = process(line[1])# .strip()
             key = 'source' if line_t == 'S' else 'target'
             data[ex_idx][key] = text
         elif line_t == 'H':
@@ -82,26 +87,49 @@ def format_squad(raw_data, context="source"):
             qa_idx += 1
             qas.append(qa)
         datum["qas"] = qas
-        data.append({"paragraph": [datum],
+        data.append({"paragraphs": [datum],
                      "title": dummy_title,
                     })
 
     return {"data": data}
 
-#data_file = "/checkpoint/wangalexc/fairseq/06-17-2019/summaries.out"
-#out_file = "/private/home/wangalexc/projects/qags/data/summaries.jsonl"
-#data = parse_generation(data_file, out_file)
-#write_jsonl(data, out_file)
+# Extract summaries
+def extract_summary_source_pairs():
+    data_file = "/checkpoint/wangalexc/fairseq/06-17-2019/summaries.out"
+    data = parse_generation(data_file)
+    #write_jsonl(data, out_file)
+    summaries = [d['hypotheses'][0][0] for d in data.values() if len(d['hypotheses']) > 0]
+    out_file = "/private/home/wangalexc/projects/qags/data/summaries.txt"
+    write_text(summaries, out_file)
 
-#data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.out"
-#out_file = "/private/home/wangalexc/projects/qags/data/questions.jsonl"
-#data = parse_generation(data_file)
-#write_jsonl(data, out_file)
-#data = format_squad(data, "source")
+    sources = [d['source'] for d in data.values() if len(d['hypotheses']) > 0]
+    out_file = "/private/home/wangalexc/projects/qags/data/sources.txt"
+    write_text(sources, out_file)
 
-data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.sampling.out"
-out_file = "/private/home/wangalexc/projects/qags/data/questions.sampling.jsonl"
-data = parse_generation(data_file)
-print_samples(data, n_samples=N_SAMPLES)
-write_jsonl(data, out_file)
+# Extract questions
+def extract_questions_and_write_jsonl():
+    #data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.sampling.out"
+    #out_file = "/private/home/wangalexc/projects/qags/data/questions.sampling.jsonl"
+    #data_file = "/checkpoint/wangalexc/fairseq/06-27-2019/questions-cnndm-summaries.out"
+    #out_file = "/private/home/wangalexc/projects/qags/data/questions.cnndm-summaries.jsonl"
+    data_file = "/checkpoint/wangalexc/fairseq/06-27-2019/questions-cnndm-targets.out"
+    out_file = "/private/home/wangalexc/projects/qags/data/questions.cnndm-targets.jsonl"
 
+    data = parse_generation(data_file)
+    print_samples(data, n_samples=N_SAMPLES)
+    write_jsonl(data, out_file)
+    print(f"Extracted questions from {data_file} and wrote to {out_file}")
+
+# Extract questions and format as SQuAD
+def extract_questions_and_write_squad_json():
+    context = "target"
+    data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.out"
+    out_file = f"/private/home/wangalexc/projects/qags/data/questions.cnndm-sources.{context}.json"
+    data = parse_generation(data_file)
+    import ipdb; ipdb.set_trace()
+    data = format_squad(data, context)
+    json.dump(data, open(out_file, "w", encoding="utf-8"))
+    print(f"Extracted questions from {data_file} and wrote to {out_file}")
+
+#extract_questions_and_write_squad_json()
+extract_questions_and_write_squad_json()

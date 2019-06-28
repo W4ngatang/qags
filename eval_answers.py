@@ -70,16 +70,21 @@ def load_data(data_file):
     srcs, tgts, gens = [], [], []
     s_ans, t_ans, g_ans = [], [], []
     for datum in data:
-        srcs.append(datum["source"])
-        tgts.append(datum["target"])
-        gens.append(datum["hypotheses"][0])
+        #srcs.append(datum["source"])
+        #tgts.append(datum["target"])
+        srcs.append(datum["target"])
+        tgts.append(datum["source"])
 
-        s_ans.append(datum["src_ans"])
-        t_ans.append(datum["trg_ans"])
+        gens.append(datum["hypotheses"][0])
         g_ans.append(datum["gen_ans"])
 
+        #s_ans.append(datum["src_ans"])
+        #t_ans.append(datum["trg_ans"])
+        s_ans.append(datum["trg_ans"])
+        t_ans.append(datum["src_ans"])
+
         qsts.append(datum["questions"][0])
-    assert len(srcs) == len(tgts) == len(gens)
+    assert len(srcs) == len(tgts) == len(gens) == len(s_ans) == len(t_ans) == len(g_ans)
     return qsts, s_ans, t_ans, g_ans, srcs, tgts, gens
 
 def print_samples(ex_idxs, par, ans, qst, tgt, n_samples=5):
@@ -95,25 +100,26 @@ def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answers')
     parser.add_argument('--metric', type=str, default='em',
                         choices=['em', 'f1', 'ed'])
-    parser.add_argument('--data-file', type=str, default='data/bidaf_outs.jsonl')
+    parser.add_argument('--data-file', type=str, default='data/bidaf.cnndm-src-qs.preds.jsonl')
     args = parser.parse_args()
 
     qsts, s_ans, t_ans, g_ans, srcs, tgts, gens = load_data(args.data_file)
-    tgt_score, good_tgt, bad_tgt = evaluate(tgts=s_ans, prds=t_ans, metric_name=args.metric)
-    gen_score, good_gen, bad_gen = evaluate(tgts=s_ans, prds=g_ans, metric_name=args.metric)
-    print(f"Tgt score: {tgt_score}")
-    print(f"Gen score: {gen_score}")
+    for metric in ['em', 'f1', 'ed']:
+        tgt_score, good_tgt, bad_tgt = evaluate(tgts=s_ans, prds=t_ans, metric_name=metric)
+        gen_score, good_gen, bad_gen = evaluate(tgts=s_ans, prds=g_ans, metric_name=metric)
+        print(f"Tgt {metric}: {tgt_score}")
+        print(f"Gen {metric}: {gen_score}")
     print()
 
-    print("Good target answers")
-    print_samples(good_tgt, par=tgts, ans=t_ans, qst=qsts, tgt=s_ans)
-    print("Bad target answers")
-    print_samples(bad_tgt, par=tgts, ans=t_ans, qst=qsts, tgt=s_ans)
+    #print("Good target answers")
+    #print_samples(good_tgt, par=tgts, ans=t_ans, qst=qsts, tgt=s_ans)
+    #print("Bad target answers")
+    #print_samples(bad_tgt, par=tgts, ans=t_ans, qst=qsts, tgt=s_ans)
 
-    print("Good generation answers")
-    print_samples(good_gen, par=gens, ans=g_ans, qst=qsts, tgt=s_ans)
-    print("Bad generation answers")
-    print_samples(bad_gen, par=gens, ans=g_ans, qst=qsts, tgt=s_ans)
+    #print("Good generation answers")
+    #print_samples(good_gen, par=gens, ans=g_ans, qst=qsts, tgt=s_ans)
+    #print("Bad generation answers")
+    #print_samples(bad_gen, par=gens, ans=g_ans, qst=qsts, tgt=s_ans)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
