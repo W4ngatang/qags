@@ -62,7 +62,7 @@ def main():
                         "bert-base-multilingual-cased, bert-base-chinese.")
     parser.add_argument("--output_dir", default=None, type=str, required=True,
                         help="The output directory where the model checkpoints and predictions will be written.")
-    parser.add_argument("--load_model_from_dir", default=None, type=str, required=True,
+    parser.add_argument("--load_model_from_dir", default=None, type=str,
                         help="Directory from which to load a model checkpoint.")
 
     ## Other parameters

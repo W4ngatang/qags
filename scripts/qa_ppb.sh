@@ -1,6 +1,7 @@
 # Do QA stuff with pytorch pretrained BERT
 
-bert_version=${2:-"bert-base-uncased"}
+bert_version=${2:-"bert-large-uncased"}
+#bert_version=${2:-"bert-large-uncased-whole-word-masking"}
 date=$(date '+%m-%d-%Y')
 
 function train_v1_1() {
@@ -71,13 +72,18 @@ function evaluate_v2_0() {
 }
 
 function predict() {
-    #export pred_file=/private/home/wangalexc/projects/qags/data/questions.cnndm-sources.source.json
-    export pred_file=/private/home/wangalexc/projects/qags/data/questions.cnndm-sources.target.json
-	export out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/06-25-2019-v2
+    #date="07-02-2019"
+    date="06-25-2019"
+    #bert_version="bert-large-uncased-whole-word-masking-finetuned-squad"
+    bert_version="bert-large-uncased"
+    question_source="summaries"
+    context="sources"
+    export pred_file=/private/home/wangalexc/projects/qags/data/questions.cnndm-${question_source}.${context}.json
+	export out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/${date}-v1-1
     mkdir -p ${out_dir}
 
     # NOTE(Alex): maybe need --version_2_with_negative \
-	python run_ppb_squad.py \
+	python -m ipdb run_ppb_squad.py \
 	  --bert_model ${bert_version} \
 	  --do_predict \
 	  --do_lower_case \
@@ -86,12 +92,24 @@ function predict() {
 	  --doc_stride 128 \
 	  --output_dir ${out_dir} \
       --overwrite_output_dir \
-      --load_model_from_dir ${out_dir}
+      #--version_2_with_negative
+      #--load_model_from_dir ${out_dir} \
+
+    mv ${out_dir}/predictions.json ${out_dir}/predictions.cnndm-${question_source}.${context}.json
 }
 
 function evaluate_answers() {
-    src_file=/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019-v2/predictions.cnndm-sources.source.json
-    trg_file=/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019-v2/predictions.cnndm-sources.target.json
+    bert_version="bert-large-uncased"
+    squad_version="1-1"
+    question_source="sources"
+    context="targets"
+
+    #src_file=/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019-v2/predictions.cnndm-sources.sources.json
+    #trg_file=/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019-v2/predictions.cnndm-sources.targets.json
+
+    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/06-25-2019-v${squad_version}/predictions.cnndm-${question_source}.sources.json
+    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/06-25-2019-v${squad_version}/predictions.cnndm-${question_source}.targets.json
+
     python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file}
 }
 
