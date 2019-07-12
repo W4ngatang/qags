@@ -1,7 +1,8 @@
 # Do QA stuff with pytorch pretrained BERT
 
 bert_version=${2:-"bert-large-uncased"}
-#bert_version=${2:-"bert-large-uncased-whole-word-masking"}
+qst_src=${3:-"src"}
+txt_fld=${4:-"trg"}
 date=$(date '+%m-%d-%Y')
 
 function train_v1_1() {
@@ -73,17 +74,19 @@ function evaluate_v2_0() {
 
 function predict() {
     #date="07-02-2019"
-    date="06-25-2019"
     #bert_version="bert-large-uncased-whole-word-masking-finetuned-squad"
+
+    date="06-25-2019"
     bert_version="bert-large-uncased"
-    question_source="summaries"
-    context="sources"
-    export pred_file=/private/home/wangalexc/projects/qags/data/questions.cnndm-${question_source}.${context}.json
-	export out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/${date}-v1-1
+
+    squad_version="v2_0"
+
+    pred_file=/private/home/wangalexc/projects/qags/data/qst-${qst_src}.cnndm-${txt_fld}.json
+	out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}
     mkdir -p ${out_dir}
 
     # NOTE(Alex): maybe need --version_2_with_negative \
-	python -m ipdb run_ppb_squad.py \
+	python run_ppb_squad.py \
 	  --bert_model ${bert_version} \
 	  --do_predict \
 	  --do_lower_case \
@@ -92,10 +95,10 @@ function predict() {
 	  --doc_stride 128 \
 	  --output_dir ${out_dir} \
       --overwrite_output_dir \
-      #--version_2_with_negative
-      #--load_model_from_dir ${out_dir} \
+      --load_model_from_dir ${out_dir} \
+      --version_2_with_negative
 
-    mv ${out_dir}/predictions.json ${out_dir}/predictions.cnndm-${question_source}.${context}.json
+    mv ${out_dir}/predictions.json ${out_dir}/prd.qst-${qst_src}.cnndm-${txt_fld}.json
 }
 
 function evaluate_answers() {
