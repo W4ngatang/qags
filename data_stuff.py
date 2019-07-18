@@ -17,11 +17,23 @@ N_SAMPLES = 5
 def extract_src_trg_gen_from_fseq_log():
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
     from fseq logs and write each as a text file, one text per line. """
+
+    append_tags = False
     data_file = "/checkpoint/wangalexc/fairseq/07-01-2019/cnndm-summaries.out"
+    #data_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.gen.cnndm.test.out"
     data = parse_generation(data_file)
 
     for txt_type in ["src", "gen", "trg"]:
         txts = [d[txt_type] for d in data.values() if len(d['gen']) > 0]
+        if append_tags:
+            if txt_type in ["src", "trg"]:
+                txts = [f"<t> {txt} </t>" for txt in txts]
+            else:
+                txts = [[f"<t> {hyp[0]} </t>"] for hyps in txts for hyp in hyps]
+
+        if txt_type == "gen":
+            txts = [t[0] for t in txts]
+
         out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
         write_text(txts, out_file)
         print(f"Wrote {len(txts)} texts to {out_file}")
@@ -33,9 +45,14 @@ def aggregate_questions():
     Each fseq log should have the txt field as 'source' (S)
     and the questions as generated 'hypotheses' (H) """
 
-    src_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.src.cnndm.test.out"
-    trg_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg.cnndm.test.out"
-    gen_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.gen.cnndm.test.out"
+    #src_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.src.cnndm.test.out"
+    #trg_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg.cnndm.test.out"
+    #gen_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.gen.cnndm.test.out"
+
+    model = "gen"
+    src_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.src-onmt-order.cnndm.test.out"
+    trg_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg-onmt-order.cnndm.test.out"
+    gen_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.{model}.cnndm.test.out"
 
     qst_files = {
                  "src": src_qst_file,
@@ -57,13 +74,15 @@ def aggregate_questions():
 
         raw_data = {}
         assert txts.keys() == qsts.keys()
-        for k in txts:
+        sorted_keys = list(txts.keys())
+        sorted_keys.sort()
+        for k in sorted_keys:
             txt = txts[k]
             qst = qsts[k]
             raw_data[k] = {txt_fld: txt, "hypotheses": qst}
 
         data = format_squad(raw_data, context=txt_fld)
-        out_file = f"/private/home/wangalexc/projects/qags/data/qst-{qst_src}.cnndm-{txt_fld}.json"
+        out_file = f"/private/home/wangalexc/projects/qags/data/{model}/qst-{qst_src}.cnndm-{txt_fld}.json"
         json.dump(data, open(out_file, "w", encoding="utf-8"))
 
 
@@ -105,7 +124,7 @@ def extract_questions_and_write_squad_json():
     json.dump(data, open(out_file, "w", encoding="utf-8"))
     print(f"Extracted questions from {data_file} and wrote to {out_file}")
 
-#extract_src_trg_gen_from_fseq_log()
+extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
 #extract_questions_and_write_squad_json()
-aggregate_questions()
+#aggregate_questions()

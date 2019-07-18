@@ -8,27 +8,7 @@ import argparse
 import editdistance
 from collections import Counter
 
-def _em(x, y):
-    """ exact match """
-    return int(x == y)
-
-
-def _f1(x, y):
-    """ token level f1 """
-    xs = x.split()
-    ys = y.split()
-    pcs = sum([1 for y in ys if y in xs]) / len(ys)
-    rcl = sum([1 for x in xs if x in ys]) / len(xs)
-    if pcs + rcl == 0:
-        return 0
-    else:
-        return 2 * (pcs * rcl) / (pcs + rcl)
-
-
-def _ed(x, y):
-    """ edit distance """
-    return editdistance.eval(x, y)
-
+import numpy as np
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
@@ -48,21 +28,29 @@ def normalize_answer(s):
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
-def f1_score(prediction, ground_truth):
-    prediction_tokens = normalize_answer(prediction).split()
-    ground_truth_tokens = normalize_answer(ground_truth).split()
-    common = Counter(prediction_tokens) & Counter(ground_truth_tokens)
+def get_tokens(s):
+    if not s: return []
+    return normalize_answer(s).split()
+
+
+def f1_score(a_gold, a_pred):
+    gold_toks = get_tokens(a_gold)
+    pred_toks = get_tokens(a_pred)
+    common = Counter(gold_toks) & Counter(pred_toks)
     num_same = sum(common.values())
+    if len(gold_toks) == 0 or len(pred_toks) == 0:
+        # If either is no-answer, then F1 is 1 if they agree, 0 otherwise
+        return int(gold_toks == pred_toks)
     if num_same == 0:
         return 0
-    precision = 1.0 * num_same / len(prediction_tokens)
-    recall = 1.0 * num_same / len(ground_truth_tokens)
+    precision = 1.0 * num_same / len(pred_toks)
+    recall = 1.0 * num_same / len(gold_toks)
     f1 = (2 * precision * recall) / (precision + recall)
     return f1
 
 
 def exact_match_score(prediction, ground_truth):
-    return (normalize_answer(prediction) == normalize_answer(ground_truth))
+    return int(normalize_answer(prediction) == normalize_answer(ground_truth))
 
 
 def edit_distance_score(prediction, ground_truth):
@@ -76,6 +64,21 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
         score = metric_fn(prediction, ground_truth)
         scores_for_ground_truths.append(score)
     return max(scores_for_ground_truths)
+
+
+def aggregate_examples(scores, n_qst_per_doc=5):
+    """Jank way to aggregate questions across examples.
+    Right now (7/18/19), questions by examples are grouped together.
+    """
+    assert len(scores) % n_qst_per_doc == 0, "Number of questions invalid"
+    n_doc = int(len(scores) / n_qst_per_doc)
+
+    agg_scores = []
+    for i in range(n_doc):
+        agg_score = sum(scores[i * n_qst_per_doc : (i + 1) * n_qst_per_doc]) / n_qst_per_doc
+        agg_scores.append(agg_score)
+
+    return agg_scores
 
 
 def evaluate(tgts, prds, metric_name="em"):
@@ -104,8 +107,9 @@ def evaluate(tgts, prds, metric_name="em"):
 
     for ex_id, (tgt, prd) in enumerate(zip(tgts, prds)):
         score = metric_max_over_ground_truths(metric, prd, [tgt])
-
         scores.append(score)
+
+        # tracking goold + bad EM examples
         if metric_name == "em" and score == 1:
             good_exs.append(ex_id)
         elif metric_name == "em" and score == 0:
@@ -113,7 +117,16 @@ def evaluate(tgts, prds, metric_name="em"):
         elif metric_name == "em":
             raise ValueError("Weird EM value found")
 
-    return 100. * sum(scores) / n_exs, good_exs, bad_exs
+    scores = aggregate_examples(scores)
+
+    scores = np.array(scores)
+    mean = scores.mean()
+    std = scores.std()
+    if metric_name != "ed":
+        mean *= 100.
+        std *= 100.
+
+    return mean, std, good_exs, bad_exs
 
 def load_data(data_file):
     """ """
@@ -129,9 +142,8 @@ def align_ans(srcs, trgs):
 
 def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answer outputs from pytorch_pretrained_bert models')
-    parser.add_argument('--source-ans-file', type=str, default='/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019-v2/predictions.cnndm-sources.source.json')
+    parser.add_argument('--source-ans-file', type=str, default=None)
     parser.add_argument('--target-ans-file', type=str, default=None)
-    parser.add_argument('--generation-ans-file', type=str, default=None)
     args = parser.parse_args()
 
     srcs = load_data(args.source_ans_file)
@@ -139,17 +151,9 @@ def main(arguments):
         trgs = load_data(args.target_ans_file)
         src_ans, trg_ans = align_ans(srcs, trgs)
         for metric in ['em', 'f1', 'ed']:
-            tgt_score, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans, metric_name=metric)
-            print(f"Tgt {metric}: {tgt_score}")
+            tgt_mean, tgt_std, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans, metric_name=metric)
+            print(f"Tgt {metric}: mean {tgt_mean}, std {tgt_std}")
 
-    if args.generation_ans_file is not None:
-        gen_ans = load_data(args.generation_ans_file)
-        src_ans, gen_ans = align_ans(srcs, gens)
-        for metric in ['em', 'f1', 'ed']:
-            gen_score, good_gen, bad_gen = evaluate(tgts=src_ans, prds=gen_ans, metric_name=metric)
-            print(f"Gen {metric}: {gen_score}")
-
-    src_ans = load_data(args.source_ans_file)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

@@ -3,6 +3,7 @@
 bert_version=${2:-"bert-large-uncased"}
 qst_src=${3:-"src"}
 txt_fld=${4:-"trg"}
+gen_mdl=${5:-"fseq"}
 date=$(date '+%m-%d-%Y')
 
 function train_v1_1() {
@@ -73,16 +74,14 @@ function evaluate_v2_0() {
 }
 
 function predict() {
-    #date="07-02-2019"
-    #bert_version="bert-large-uncased-whole-word-masking-finetuned-squad"
 
     date="06-25-2019"
-    bert_version="bert-large-uncased"
-
     squad_version="v2_0"
 
-    pred_file=/private/home/wangalexc/projects/qags/data/qst-${qst_src}.cnndm-${txt_fld}.json
-	out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}
+    pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
+	mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
+	out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
+	out_file="${out_dir}/prd.qst-${qst_src}.cnndm-${txt_fld}.json"
     mkdir -p ${out_dir}
 
     # NOTE(Alex): maybe need --version_2_with_negative \
@@ -94,26 +93,43 @@ function predict() {
 	  --max_seq_length 384 \
 	  --doc_stride 128 \
 	  --output_dir ${out_dir} \
+      --prediction_file ${out_file} \
       --overwrite_output_dir \
-      --load_model_from_dir ${out_dir} \
+      --load_model_from_dir ${mdl_dir} \
       --version_2_with_negative
 
-    mv ${out_dir}/predictions.json ${out_dir}/prd.qst-${qst_src}.cnndm-${txt_fld}.json
 }
 
 function evaluate_answers() {
-    bert_version="bert-large-uncased"
-    squad_version="1-1"
-    question_source="sources"
-    context="targets"
+    squad_version="2_0"
 
-    #src_file=/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019-v2/predictions.cnndm-sources.sources.json
-    #trg_file=/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019-v2/predictions.cnndm-sources.targets.json
+    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst-${qst_src}.cnndm-src.json
+    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst-${qst_src}.cnndm-${txt_fld}.json
 
-    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/06-25-2019-v${squad_version}/predictions.cnndm-${question_source}.sources.json
-    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/06-25-2019-v${squad_version}/predictions.cnndm-${question_source}.targets.json
+    echo "Gold file: ${src_file}"
+    echo "Pred file: ${trg_file}"
+    python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file};
+    #python -m ipdb evaluate-squad-v2-0.py --data-file ${src_file} --pred-file ${trg_file} --verbose
 
-    python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file}
+}
+
+function evaluate_all_answers() {
+    squad_version="2_0"
+    gen_mdl="lstm"
+
+    for qst_src in src gen trg; do 
+        for txt_fld in trg gen; do
+            for bert_version in bert-base-uncased bert-large-uncased bert-large-uncased-whole-word-masking; do
+                src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst-${qst_src}.cnndm-src.json
+                trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst-${qst_src}.cnndm-${txt_fld}.json
+
+                echo "Gold file: ${src_file}"
+                echo "Pred file: ${trg_file}"
+                python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file};
+                #python -m ipdb evaluate-squad-v2-0.py --data-file ${src_file} --pred-file ${trg_file} --verbose
+            done;
+        done;
+    done
 }
 
 if [ $1 == "train-v1.1" ]; then
@@ -128,6 +144,8 @@ elif [ $1 == "predict" ]; then
     predict
 elif [ $1 == "evaluate" ]; then
     evaluate_answers
+elif [ $1 == "evaluate-all" ]; then
+    evaluate_all_answers
 else
     echo "Command not found"
 fi

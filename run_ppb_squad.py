@@ -64,6 +64,8 @@ def main():
                         help="The output directory where the model checkpoints and predictions will be written.")
     parser.add_argument("--load_model_from_dir", default=None, type=str,
                         help="Directory from which to load a model checkpoint.")
+    parser.add_argument("--prediction_file", default="predictions.json", type=str,
+                        help="The name of the file where predictions will be written, in output_dir.")
 
     ## Other parameters
     parser.add_argument("--train_file", default=None, type=str, help="SQuAD json for training. E.g., train-v1.1.json")
@@ -401,7 +403,7 @@ def main():
                 all_results.append(RawResult(unique_id=unique_id,
                                              start_logits=start_logits,
                                              end_logits=end_logits))
-        output_prediction_file = os.path.join(args.output_dir, "predictions.json")
+        output_prediction_file = os.path.join(args.output_dir, args.prediction_file)
         output_nbest_file = os.path.join(args.output_dir, "nbest_predictions.json")
         output_null_log_odds_file = os.path.join(args.output_dir, "null_odds.json")
         write_predictions(eval_examples, eval_features, all_results,

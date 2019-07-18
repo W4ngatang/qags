@@ -18,8 +18,8 @@ OPTS = None
 
 def parse_args():
     parser = argparse.ArgumentParser('Official evaluation script for SQuAD version 2.0.')
-    parser.add_argument('data_file', metavar='data.json', help='Input data JSON file.')
-    parser.add_argument('pred_file', metavar='pred.json', help='Model predictions.')
+    parser.add_argument('--data-file', metavar='data.json', help='Input data JSON file.')
+    parser.add_argument('--pred-file', metavar='pred.json', help='Model predictions.')
     parser.add_argument('--out-file', '-o', metavar='eval.json',
                                             help='Write accuracy metrics to file (default is stdout).')
     parser.add_argument('--na-prob-file', '-n', metavar='na_prob.json',

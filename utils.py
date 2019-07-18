@@ -13,6 +13,10 @@ def filter_line_fseq(line):
     """
     return re.match(r'(S|T|H|P)-[0-9]+\t', line) is None
 
+def load_txt(data_file):
+    """ Load a txt file with a text per line. """
+    return open(data_file, encoding="utf-8").readlines()
+
 def write_jsonl(data, out_file):
     """ Write a dictionary to out_file as a jsonl """
     with open(out_file, 'w', encoding='utf-8') as out_fh:
