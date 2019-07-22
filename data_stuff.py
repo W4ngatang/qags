@@ -1,5 +1,6 @@
 """ Extract generations from fairseq outputs """
 
+import os
 import re
 import json
 import copy
@@ -49,10 +50,11 @@ def aggregate_questions():
     #trg_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg.cnndm.test.out"
     #gen_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.gen.cnndm.test.out"
 
-    model = "gen"
-    src_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.src-onmt-order.cnndm.test.out"
-    trg_qst_file = "/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg-onmt-order.cnndm.test.out"
-    gen_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.{model}.cnndm.test.out"
+    model = "lstmsmalltied-beam10"
+    date = "07-18-2018"
+    src_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.src-onmt-order.cnndm.test.out"
+    trg_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg-onmt-order.cnndm.test.out"
+    gen_qst_file = f"/checkpoint/wangalexc/fairseq/07-18-2019/qst.{model}.cnndm.test.out"
 
     qst_files = {
                  "src": src_qst_file,
@@ -82,7 +84,10 @@ def aggregate_questions():
             raw_data[k] = {txt_fld: txt, "hypotheses": qst}
 
         data = format_squad(raw_data, context=txt_fld)
-        out_file = f"/private/home/wangalexc/projects/qags/data/{model}/qst-{qst_src}.cnndm-{txt_fld}.json"
+        out_dir = f"/private/home/wangalexc/projects/qags/data/{model}"
+        out_file = f"{out_dir}/qst-{qst_src}.cnndm-{txt_fld}.json"
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
         json.dump(data, open(out_file, "w", encoding="utf-8"))
 
 
@@ -107,24 +112,6 @@ def extract_questions_and_write_jsonl():
     print_samples(data, n_samples=N_SAMPLES)
     print(f"Extracted questions from {data_file} and wrote to {out_file}")
 
-# Extract questions and format as SQuAD
-def extract_questions_and_write_squad_json():
-    question_source = "summaries"
-    context = "source"
-    #data_file = f"/checkpoint/wangalexc/fairseq/06-27-2019/questions-cnndm-{question_source}.out"
-    data_file = f"/checkpoint/wangalexc/fairseq/07-09-2019/questions-cnndm-{question_source}-full.out"
-    out_file = f"/private/home/wangalexc/projects/qags/data/questions.cnndm-{question_source}.{context}.json"
-
-    data = parse_generation(data_file)
-
-    swap_d = {"source": "summaries", "target": "source" }
-    data = swap_fields(data, swap_d)
-
-    data = format_squad(data, context)
-    json.dump(data, open(out_file, "w", encoding="utf-8"))
-    print(f"Extracted questions from {data_file} and wrote to {out_file}")
-
-extract_src_trg_gen_from_fseq_log()
+#extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
-#extract_questions_and_write_squad_json()
-#aggregate_questions()
+aggregate_questions()

@@ -5,6 +5,8 @@ import json
 import random
 import argparse
 
+import numpy as np
+
 from utils import load_txt
 
 N_SAMPLE = 100
@@ -94,7 +96,7 @@ def sample_examples(verbose=True):
 
 def _length(txt):
     """ """
-    return len(txt.split())
+    return len(txt)
 
 def _get_ngrams(toks, ngram_size):
     """ """
@@ -146,7 +148,9 @@ def compute_text_stats(stat_names, txts, refs, max_n=4):
             for txt_idx, txt in enumerate(txts):
                 stat = _length(txt)
                 stats.append(stat)
-            stat2val[stat_name] = sum(stats) / len(stats)
+            stats = np.array(stats)
+            stat2val[f"{stat_name}-mean"] = stats.mean()
+            stat2val[f"{stat_name}-std"] = stats.std()
 
         elif stat_name == "ngram-overlap":
             rcls, pcss = [], []
@@ -154,23 +158,39 @@ def compute_text_stats(stat_names, txts, refs, max_n=4):
                 rcl, pcs = _ngram_overlap(txt, refs[txt_idx], max_n)
                 rcls.append(rcl)
                 pcss.append(pcs)
-            for i in range(max_n):
-                stat2val[f"{i+1}-gram_recall"] = sum([r[i] for r in rcls]) / len(rcls)
-                stat2val[f"{i+1}-gram_precision"] = sum([p[i] for p in pcss]) / len(pcss)
 
+            rcls = zip(*rcls)
+            pcss = zip(*pcss)
+
+            for i, (ngram_rcl, ngram_pcs) in enumerate(zip(rcls, pcss)):
+                ngram_rcl = np.array(ngram_rcl)
+                ngram_pcs = np.array(ngram_pcs)
+
+                stat2val[f"{i+1}-gram_recall-mean"] = 100 * ngram_rcl.mean()
+                stat2val[f"{i+1}-gram_precision-mean"] = 100 * ngram_pcs.mean()
+                stat2val[f"{i+1}-gram_recall-std"] = 100 * ngram_rcl.std()
+                stat2val[f"{i+1}-gram_precision-std"] = 100 * ngram_pcs.std()
+
+    for stat_name, stat_val in stat2val.items():
+        print(f"{stat_name}: {stat_val}")
+    print(" & ".join([f"{v:.2f}" for v in stat2val.values()]))
+    print()
     return stat2val
 
 def main(arguments):
 
-    txt_file = "/private/home/wangalexc/data/cnndailymail/fseq/onmt-models/tfmr.cnndm.test.txt"
+    #mdls = ["tfmr", "lstm", "lstmsmall", "lstmsmalltied"]
+    txt_files = [f"/private/home/wangalexc/data/cnndailymail/fseq/onmt-models/{mdl}-beam10.cnndm.test.txt" for mdl in mdls]
     ref_file = "/private/home/wangalexc/data/cnndailymail/fseq/onmt-models/src.cnndm.test.txt"
 
-    txts = load_txt(txt_file)
-    refs = load_txt(ref_file)
+    #txt_files = [f"/private/home/wangalexc/data/cnndailymail/fseq/gen.cnndm.test.txt"]
+    #ref_file = f"/private/home/wangalexc/data/cnndailymail/fseq/src.cnndm.test.txt"
 
-    stats = compute_text_stats(["ngram-overlap"], txts, refs)
-    for stat_name, stat_val in stats.items():
-        print(f"{stat_name}: {stat_val}")
+    refs = load_txt(ref_file)
+    for txt_file in txt_files:
+        txts = load_txt(txt_file)
+        print(f"Computing stats for {txt_file}")
+        stats = compute_text_stats(["length", "ngram-overlap"], txts, refs)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
