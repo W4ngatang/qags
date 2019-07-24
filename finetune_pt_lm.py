@@ -80,7 +80,7 @@ def load_data_and_tokenize(data_dir, split, task_name, special2toks):
         with open(f'{data_dir}/{split}.json', encoding="utf-8") as f:
             data = json.load(f)["data"]
 
-        for doc in data[:5]:
+        for doc in data[:1]:
             for psg_d in doc["paragraphs"]:
                 psg = psg_d["context"]
                 for qst_d in psg_d["qas"]:
@@ -465,10 +465,12 @@ def main(arguments):
                 input_ids, mc_token_ids, lm_labels, mc_labels = batch
                 outs = model(input_ids, mc_token_ids, lm_labels, mc_labels)
                 loss = args.lm_coef * outs[0] + outs[1]
+                nb_tr_steps += 1
             else:
                 input_ids, lm_labels = batch
                 outs = model(input_ids, labels=lm_labels)
                 loss = outs[0]
+                nb_tr_steps += len(lm_labels[lm_labels != -1])
 
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
@@ -481,7 +483,6 @@ def main(arguments):
             tr_loss += loss.item()
             tr_batch_loss += loss.item()
             nb_tr_example_visits += input_ids.size(0)
-            nb_tr_steps += 1
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if args.fp16:
                     # modify learning rate with special warm up BERT uses
@@ -505,8 +506,9 @@ def main(arguments):
             batch = tuple(t.to(device) for t in batch)
             if args.task_name in MC_TASK_NAMES:
                 input_ids, mc_token_ids, lm_labels, mc_labels = batch
-                with torch.no_grad():
-                    lm_loss, mc_loss = model(input_ids, mc_token_ids, lm_labels, mc_labels)
+                with torch.no_grad(): # NOTE(Alex): this is probably broken
+                    outs = model(input_ids, mc_token_ids, lm_labels, mc_labels)
+                    lm_loss, mc_loss = outs[0], outs[1]
                     eval_batch_loss = args.lm_coef * lm_loss + mc_loss
                     mc_logits = model(input_ids, mc_token_ids)[1]
 
@@ -516,17 +518,19 @@ def main(arguments):
 
                 eval_loss += eval_batch_loss.mean().item()
                 eval_accuracy += tmp_eval_accuracy
+                nb_eval_steps += 1
             else:
                 input_ids, lm_labels = batch
                 with torch.no_grad():
-                    lm_loss = model(input_ids, lm_labels=lm_labels)
+                    outs = model(input_ids, labels=lm_labels)
+                    lm_loss = outs[0]
 
                 eval_loss += lm_loss.mean().item()
+                nb_eval_steps += len(lm_labels[lm_labels != -1])
 
             nb_eval_examples += input_ids.size(0)
-            nb_eval_steps += 1
 
-        eval_loss = eval_loss / nb_eval_steps
+        eval_loss /= nb_eval_steps
         tb_writer.add_scalar('eval_loss', eval_loss, nb_tr_example_visits)
         result = {'eval_loss': eval_loss,
                   'train_loss': tr_loss / (nb_tr_steps / float(args.gradient_accumulation_steps))}
@@ -541,7 +545,7 @@ def main(arguments):
                 writer.write("%s = %s\n" % (key, str(result[key])))
 
         # Model saving and early stopping
-        print('Epoch {} complete!'.format(epoch_no))
+        log.info(f'Epoch {epoch_no + 1} complete!')
         if eval_loss < best_eval_loss:
             print('Best loss so far! {} -> {}'.format(best_eval_loss, eval_loss))
             best_eval_loss = eval_loss
