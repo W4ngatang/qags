@@ -7,10 +7,10 @@ import copy
 import random
 import itertools
 from collections import defaultdict
-from utils import filter_line_fseq, write_jsonl, write_text, \
-                  process, print_samples, parse_generation, \
-                  format_squad
-
+from utils import write_data, write_jsonl, write_txt, \
+                  process, print_samples, format_squad, \
+                  filter_line_fseq, parse_generation, \
+                  load_txt, load_json
 
 N_SAMPLES = 5
 
@@ -36,7 +36,7 @@ def extract_src_trg_gen_from_fseq_log():
             txts = [t[0] for t in txts]
 
         out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
-        write_text(txts, out_file)
+        write_txt(txts, out_file)
         print(f"Wrote {len(txts)} texts to {out_file}")
 
 
@@ -112,6 +112,47 @@ def extract_questions_and_write_jsonl():
     print_samples(data, n_samples=N_SAMPLES)
     print(f"Extracted questions from {data_file} and wrote to {out_file}")
 
+def format_abstractive_qa():
+    """ Format an extractive QA task as a freeform QA task """
+
+    def _combine(x, y):
+        """ Combine two texts, x and y """
+        return f"{x} {y}"
+
+    def _format_qa_split(data):
+        """ """
+        srcs, trgs = [], []
+
+        for doc in data:
+            for psg_d in doc["paragraphs"]:
+                psg = psg_d["context"]
+                for qst_d in psg_d["qas"]:
+                    qst = qst_d["question"]
+                    src = _combine(qst, psg)
+                    srcs.append({"input": src})
+
+                    anss = [a["text"] for a in qst_d["answers"]]
+                    if len(anss) == 0: # question has no answer
+                        ans = "<na>"
+                    else:
+                        ans = anss[0]
+                    trgs.append({"target": ans})
+
+        return srcs, trgs
+
+    data_dir = "/private/home/wangalexc/data/squad/v2.0/original"
+    out_dir = "/private/home/wangalexc/data/squad/v2.0/abstractive"
+    split2file = {"train": "train.json",
+                  "dev": "dev.json"
+                  #"test": "test.json"
+                 }
+
+    for split_name, split_file in split2file.items():
+        data = load_json(os.path.join(data_dir, split_file))["data"]
+        srcs, trgs = _format_qa_split(data)
+        write_data(srcs=srcs, trgs=trgs, out_dir=out_dir, out_prefix=split_name, out_format="jsonl")
+
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
-aggregate_questions()
+#aggregate_questions()
+format_abstractive_qa()

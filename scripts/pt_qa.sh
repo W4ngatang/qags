@@ -6,12 +6,12 @@ txt_fld=${4:-"trg"}
 gen_mdl=${5:-"fseq"}
 date=$(date '+%m-%d-%Y')
 
-function train_v1_1() {
+function train_squad_v1_1() {
 	export SQUAD_DIR=~/data/squad/v1.1/original
 	export OUT_DIR=/checkpoint/wangalexc/ppb/${bert_version}/squad_v1_1/${date}
     mkdir -p ${OUT_DIR}
 
-	python run_ppb_squad.py \
+	python finetune_pt_squad.py \
 	  --bert_model ${bert_version}  \
       --do_train \
 	  --do_predict \
@@ -27,12 +27,12 @@ function train_v1_1() {
       --overwrite_output_dir
 }
 
-function train_v2_0() {
+function train_squad_v2_0() {
 	export SQUAD_DIR=~/data/squad/v2.0/original
 	export OUT_DIR=/checkpoint/wangalexc/ppb/${bert_version}/squad_v2_0/${date}
     mkdir -p ${OUT_DIR}
 
-	python run_ppb_squad.py \
+	python finetune_pt_squad.py \
 	  --bert_model ${bert_version} \
       --do_train \
 	  --do_predict \
@@ -47,6 +47,25 @@ function train_v2_0() {
 	  --doc_stride 128 \
 	  --output_dir ${OUT_DIR} \
       --overwrite_output_dir
+}
+
+function train_nlg() {
+    model="gpt2-medium"
+	data_dir="/private/home/wangalexc/data/squad/v2.0/original"
+	out_dir="/checkpoint/wangalexc/ppb/${model}/squadv2_0_freetext/${date}"
+    mkdir -p ${out_dir}
+
+    batch_size=1
+
+	python -m ipdb finetune_pt_lm.py \
+        --model_name ${model} \
+        --task_name squad-freetext \
+	    --data_dir ${data_dir} \
+	    --out_dir ${out_dir} \
+        --overwrite_output_dir \
+        --no_input_lm_train \
+        --train_batch_size ${batch_size} \
+        --reload_data
 }
 
 function evaluate_v1_1() {
@@ -73,7 +92,7 @@ function evaluate_v2_0() {
 	python evaluate-squad-v2-0.py ${data_file} ${pred_file}
 }
 
-function predict() {
+function predict_extractive() {
 
     date="06-25-2019"
     squad_version="v2_0"
@@ -85,7 +104,7 @@ function predict() {
     mkdir -p ${out_dir}
 
     # NOTE(Alex): maybe need --version_2_with_negative \
-	python run_ppb_squad.py \
+	python finetune_pt_squad.py \
 	  --bert_model ${bert_version} \
 	  --do_predict \
 	  --do_lower_case \
@@ -132,16 +151,18 @@ function evaluate_all_answers() {
     done
 }
 
-if [ $1 == "train-v1.1" ]; then
-    train_v1_1
-elif [ $1 == "train-v2.0" ]; then
-    train_v2_0
+if [ $1 == "train-squadv1.1" ]; then
+    train_squad_v1_1
+elif [ $1 == "train-squadv2.0" ]; then
+    train_squad_v2_0
+elif [ $1 == "train-nlg" ]; then
+    train_nlg
 elif [ $1 == "evaluate-v1.1" ]; then
     evaluate_v1_1
 elif [ $1 == "evaluate-v2.0" ]; then
     evaluate_v2_0
-elif [ $1 == "predict" ]; then
-    predict
+elif [ $1 == "predict-extractive" ]; then
+    predict_extractive
 elif [ $1 == "evaluate" ]; then
     evaluate_answers
 elif [ $1 == "evaluate-all" ]; then

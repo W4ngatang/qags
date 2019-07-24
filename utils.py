@@ -1,5 +1,6 @@
 """ Various data processing utility functions """
 
+import os
 import re
 import json
 import copy
@@ -17,13 +18,55 @@ def load_txt(data_file):
     """ Load a txt file with a text per line. """
     return open(data_file, encoding="utf-8").readlines()
 
+def load_json(data_file):
+    """ """
+    data = json.load(open(data_file, encoding="utf-8"))
+    return data
+
+def write_data(srcs, trgs, out_prefix, out_dir=".", out_format="jsonl"):
+    """General function for writing out formatted data.
+
+    args:
+        - srcs (List[Dictionary]): list of inputs, each of which is a dict
+        - trgs (List[Dictionary]): list of targets, each of which is a dict
+        - out_prefix
+        - out_dir
+        - out_format (str): type of file to write out to
+    """
+
+    if out_format == "jsonl":
+        new_data = {}
+        for idx, (src, trg) in enumerate(zip(srcs, trgs)):
+            assert "target" not in src, f"Example {idx} already has a 'target' field!"
+            new_datum = copy.deepcopy(src)
+            new_datum["target"] = trg["target"]
+            new_data[idx] = new_datum
+        out_file = os.path.join(out_dir, f"{out_prefix}.jsonl")
+        write_jsonl(data=new_data, out_file=out_file)
+
+    elif out_format == "txt":
+        try:
+            srcs_out = [src["input"] for src in srcs]
+        except KeyError as e:
+            print(f"Key 'input' not found in inputs!")
+        write_txt(srcs_out, src_out_file)
+
+        try:
+            trgs_out = [trg["input"] for trg in trgs]
+        except KeyError as e:
+            print(f"Key 'input' not found in inputs!")
+        write_txt(trgs_out, trg_out_file)
+    else:
+        raise NotImplementedError(f"Writing out in format {out_format} not supported!")
+
+
 def write_jsonl(data, out_file):
     """ Write a dictionary to out_file as a jsonl """
     with open(out_file, 'w', encoding='utf-8') as out_fh:
         for datum_idx, datum in data.items():
             out_fh.write(f"{json.dumps({datum_idx: datum})}\n")
 
-def write_text(data, out_file):
+def write_txt(data, out_file):
     """ Write out an iterable of texts, one text per line """
     with open(out_file, 'w', encoding='utf-8') as out_fh:
         for datum in data:
@@ -130,5 +173,4 @@ def format_squad(raw_data, context="src"):
                     })
 
     return {"data": data}
-
 
