@@ -55,7 +55,8 @@ function train_nlg() {
 	out_dir="/checkpoint/wangalexc/ppb/${model}/squadv2_0_freetext/${date}"
     mkdir -p ${out_dir}
 
-    batch_size=4
+    batch_size=8
+    grad_accum=4
     learning_rate=.001
     n_epochs=100
     patience=10
@@ -68,6 +69,7 @@ function train_nlg() {
         --overwrite_output_dir \
         --no_input_lm_train \
         --train_batch_size ${batch_size} \
+        --gradient_accumulation_steps ${grad_accum} \
         --learning_rate ${learning_rate} \
         --num_train_epochs ${n_epochs} \
         --patience ${patience} #\
