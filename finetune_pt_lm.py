@@ -80,7 +80,7 @@ def load_data_and_tokenize(data_dir, split, task_name, special2toks):
         with open(f'{data_dir}/{split}.json', encoding="utf-8") as f:
             data = json.load(f)["data"]
 
-        for doc in data[:1]:
+        for doc in data:
             for psg_d in doc["paragraphs"]:
                 psg = psg_d["context"]
                 for qst_d in psg_d["qas"]:
@@ -160,11 +160,11 @@ def tensorfy(data, max_seq_len, task_name, special2idx,
         delim_idx = special2idx['delim_tok']
         max_ans_len = max(len(ans) for _, _, ans in data)
         cap_len = (max_seq_len - max_ans_len) // 2
-        input_len = max(len(qst[:cap_len]) + len(psg[:cap_len]) + len(ans) + 3 for qst, psg, ans in data)
+        input_len = max(len(qst[:cap_len]) + len(psg[:cap_len]) + len(ans) + 4 for qst, psg, ans in data)
         input_ids = np.zeros((n_batch, 1, input_len), dtype=np.int64)
         lm_labels = np.full((n_batch, 1, input_len), fill_value=-1, dtype=np.int64)
         for i, (qst, psg, ans) in enumerate(data):
-            ex = [sos_idx] + qst[:cap_len] + [delim_idx] + psg[:cap_len] + [eoi_idx] + ans
+            ex = [sos_idx] + qst[:cap_len] + [delim_idx] + psg[:cap_len] + [eoi_idx] + ans + [eoi_idx]
             input_ids[i, 0, :len(ex)] = ex
             if no_input_lm:
                 assert eoi_idx is not None and eoi_idx in ex, f'end of input token {eoi_tok} not in example {ex}'
@@ -315,10 +315,10 @@ def setup(outdir, seed, overwrite_output_dir):
     # Output directory
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-    elif overwrite_output_dir:
-        log.info(f'Overwriting existing output directory {outdir}')
-        shutil.rmtree(outdir)
-        os.makedirs(outdir)
+    #elif overwrite_output_dir:
+    #    log.info(f'Overwriting existing output directory {outdir}')
+    #    shutil.rmtree(outdir)
+    #    os.makedirs(outdir)
 
     # Log file
     log_file = os.path.join(outdir, "train.log")
@@ -418,7 +418,7 @@ def main(arguments):
     splits = ["train", "dev"]
     split2data = {}
     for split in splits:
-        cached_data_file = f'{args.data_dir}/{args.task_name}.indexed_data.{split}.json'
+        cached_data_file = f'{args.out_dir}/{args.task_name}.indexed_data.{split}.json'
         if os.path.exists(cached_data_file) and not args.reload_data:
             log.info(f"Task {args.task_name}: loading {split} from {cached_data_file}...")
             with open(cached_data_file, 'r') as f:
@@ -491,6 +491,7 @@ def main(arguments):
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = lr_this_step
                 optimizer.step()
+                scheduler.step()
                 optimizer.zero_grad()
                 global_step += 1
                 tb_writer.add_scalar('lr', scheduler.get_lr()[0], nb_tr_example_visits)
@@ -526,7 +527,7 @@ def main(arguments):
                     lm_loss = outs[0]
 
                 eval_loss += lm_loss.mean().item()
-                nb_eval_steps += len(lm_labels[lm_labels != -1])
+                nb_eval_steps += 1 #len(lm_labels[lm_labels != -1])
 
             nb_eval_examples += input_ids.size(0)
 

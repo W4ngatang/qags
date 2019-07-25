@@ -55,7 +55,10 @@ function train_nlg() {
 	out_dir="/checkpoint/wangalexc/ppb/${model}/squadv2_0_freetext/${date}"
     mkdir -p ${out_dir}
 
-    batch_size=1
+    batch_size=4
+    learning_rate=.001
+    n_epochs=100
+    patience=10
 
 	python -m ipdb finetune_pt_lm.py \
         --model_name ${model} \
@@ -65,7 +68,10 @@ function train_nlg() {
         --overwrite_output_dir \
         --no_input_lm_train \
         --train_batch_size ${batch_size} \
-        --reload_data
+        --learning_rate ${learning_rate} \
+        --num_train_epochs ${n_epochs} \
+        --patience ${patience} #\
+        #--reload_data
 }
 
 function evaluate_v1_1() {
