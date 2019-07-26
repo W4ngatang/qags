@@ -31,7 +31,9 @@ from tqdm import tqdm, trange
 import spacy
 import numpy as np
 import torch
-from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset)
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel
+from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset, DistributedSampler)
 from tensorboardX import SummaryWriter
 from pytorch_transformers import OpenAIGPTDoubleHeadsModel, OpenAIGPTLMHeadModel, OpenAIGPTTokenizer, \
                                  AdamW, WEIGHTS_NAME, CONFIG_NAME, \
@@ -193,7 +195,8 @@ def tensorfy(data, max_seq_len, task_name, special2idx,
 def create_loader(data, batch_size):
     """ """
     dataset = TensorDataset(*data)
-    sampler = RandomSampler(dataset)
+    #sampler = RandomSampler(dataset)
+    sampler = DistributedSampler(dataset)
     data_loader = DataLoader(dataset, sampler=sampler, batch_size=batch_size)
     return data_loader
 
@@ -239,29 +242,12 @@ def get_optimizer_and_scheduler(model, data, args):
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
     num_train_optimization_steps = len(data) // args.gradient_accumulation_steps * args.num_train_epochs
-    if args.fp16:
-        try:
-            from apex.optimizers import FP16_Optimizer
-            from apex.optimizers import FusedAdam
-        except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-
-        optimizer = FusedAdam(optimizer_grouped_parameters,
-                              lr=args.learning_rate,
-                              bias_correction=False,
-                              max_grad_norm=1.0)
-        if args.loss_scale == 0:
-            optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
-        else:
-            optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
-
-    else:
-        optimizer = AdamW(optimizer_grouped_parameters,
-                          lr=args.learning_rate,
-                          #max_grad_norm=args.max_grad_norm,
-                          weight_decay=args.weight_decay#,
-                          #t_total=num_train_optimization_steps
-                          )
+    optimizer = AdamW(optimizer_grouped_parameters,
+                      lr=args.learning_rate,
+                      #max_grad_norm=args.max_grad_norm,
+                      weight_decay=args.weight_decay#,
+                      #t_total=num_train_optimization_steps
+                      )
     scheduler = WarmupLinearSchedule(optimizer=optimizer,
                                      warmup_steps=args.warmup_proportion * num_train_optimization_steps,
                                      t_total=num_train_optimization_steps)
@@ -337,6 +323,20 @@ def main(arguments):
                         help="Overwrite the content of the output directory")
     parser.add_argument('--seed', type=int, default=42)
 
+    # CUDA / GPU options
+    parser.add_argument('--local_rank', type=int, default=-1, help='local_rank for distributed training on gpus')
+    parser.add_argument('--no_cuda', action='store_true', default=False, help='turn on to use cpu')
+    parser.add_argument('--use_one_gpu', action='store_true', default=False, help='only use one GPU, even if multiple are available')
+
+    # FP16 stuff
+    parser.add_argument('--fp16', action='store_true', help="Whether to use 16-bit float precision instead of 32-bit")
+    parser.add_argument('--fp16_loss_scale', type=float, default=0,
+                        help="Loss scaling to improve fp16 numeric stability. Only used when fp16 set to True.\n"
+                             "0 (default value): dynamic loss scaling.\n"
+                             "Positive power of 2: static loss scaling value.\n")
+    parser.add_argument('--fp16_opt_level', type=str, choices=['O0', 'O1', 'O2', 'O3'],
+                        default='O2', help="Level of optimizations when using fp16")
+
     # Preprocessing options
     parser.add_argument('--reload_data', action='store_true')
 
@@ -349,6 +349,8 @@ def main(arguments):
     # Training details
     parser.add_argument('--num_train_epochs', type=int, default=3)
     parser.add_argument('--train_batch_size', type=int, default=32)
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
+                        help="Number of updates steps to accumulate before performing a backward/update pass.")
     parser.add_argument('--max_grad_norm', type=int, default=1)
     parser.add_argument('--learning_rate', type=float, default=6.25e-5)
     parser.add_argument('--warmup_proportion', type=float, default=0.002)
@@ -360,28 +362,36 @@ def main(arguments):
     parser.add_argument('--no_input_lm_train', action='store_true', help="Use LM loss on input while training?")
     parser.add_argument('--no_input_lm_eval', action='store_true', help="Use LM loss on input while evaluating?")
 
-    # CUDA / GPU stuff
-    parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
-                        help="Number of updates steps to accumulate before performing a backward/update pass.")
-    parser.add_argument('--fp16', action='store_true', help="Whether to use 16-bit float precision instead of 32-bit")
-    parser.add_argument('--loss_scale', type=float, default=0,
-                        help="Loss scaling to improve fp16 numeric stability. Only used when fp16 set to True.\n"
-                             "0 (default value): dynamic loss scaling.\n"
-                             "Positive power of 2: static loss scaling value.\n")
 
     args = parser.parse_args(arguments)
-    print(args)
+    log.info(args)
 
     # Logging and outputs
     setup(outdir=args.out_dir, seed=args.seed, overwrite_output_dir=args.overwrite_output_dir)
 
     # GPU stuff
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    n_gpu = torch.cuda.device_count()
+
+    if args.local_rank == -1 or args.use_one_gpu or args.no_cuda:
+        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        n_gpu = torch.cuda.device_count()
+    else:
+        torch.cuda.set_device(args.local_rank)
+        device = torch.device("cuda", args.local_rank)
+        n_gpu = 1
+
+        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_PORT'] = '12355'
+        torch.distributed.init_process_group(backend='nccl', world_size=1, rank=args.local_rank)
+
+        world_size=8
+        mp.spawn(proc, args=(world_size,),
+                 nprocs=world_size, join=True)
+
     log.info("device: {}, n_gpu {}, 16-bits training: {}".format(device, n_gpu, args.fp16))
+
     assert args.gradient_accumulation_steps >= 1, f"gradient_accumulation_steps should be >= 1, found {args.gradient_accumulation_steps}"
     train_batch_size = args.train_batch_size // args.gradient_accumulation_steps
-    eval_batch_size = 2 * args.train_batch_size
+    eval_batch_size = 1 * args.train_batch_size
     task_name = args.task_name
 
     # Load model tokenizer (since pretrained models have a particular vocabulary)
@@ -405,8 +415,7 @@ def main(arguments):
 
     # Load pretrained model
     model = get_pretrained_model(args.model_name, task_name, tokenizer)
-    if args.fp16:
-        model.half()
+    n_positions = model.config.n_positions
     model.to(device)
 
 
@@ -436,7 +445,7 @@ def main(arguments):
 
         no_input_lm = args.no_input_lm_train if split == "train" else args.no_input_lm_eval
         tsr_data = tensorfy(idx_data,
-                            max_seq_len=model.config.n_positions,
+                            max_seq_len=n_positions,
                             task_name=task_name,
                             special2idx=special_tokens_ids,
                             no_input_lm=no_input_lm,
@@ -449,6 +458,20 @@ def main(arguments):
 
     # Prepare optimizer
     optimizer, scheduler = get_optimizer_and_scheduler(model, train_dataloader, args)
+
+    # FP16 stuff
+    # Move to DataParallel after amp
+    if args.fp16:
+        try:
+            from apex import amp, optimizers
+        except ImportError:
+            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
+        model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level,
+                                          keep_batchnorm_fp32=True)
+    if args.local_rank != -1 and not args.use_one_gpu:
+        model = DistributedDataParallel(model, device_ids=[args.local_rank])
+    elif not args.use_one_gpu:
+        model = torch.nn.parallel.DataParallel(model)
 
     # Train loop
     tb_writer = SummaryWriter(args.out_dir)
@@ -475,8 +498,11 @@ def main(arguments):
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
 
+            if n_gpu > 1: # if using multiple GPUs
+                loss = loss.sum()
             if args.fp16:
-                optimizer.backward(loss)
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
             else:
                 loss.backward()
 
@@ -487,7 +513,7 @@ def main(arguments):
                 if args.fp16:
                     # modify learning rate with special warm up BERT uses
                     # if args.fp16 is False, BertAdam is used that handles this automatically
-                    lr_this_step = args.learning_rate * scheduler.get_lr(global_step, args.warmup_proportion)
+                    lr_this_step = args.learning_rate * scheduler.get_lr()[0] #global_step, args.warmup_proportion)
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = lr_this_step
                 optimizer.step()
@@ -565,3 +591,4 @@ def main(arguments):
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
+

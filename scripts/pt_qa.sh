@@ -56,10 +56,11 @@ function train_nlg() {
     mkdir -p ${out_dir}
 
     batch_size=8
-    grad_accum=4
+    grad_accum=1
     learning_rate=.001
-    n_epochs=100
-    patience=10
+    n_epochs=3
+    patience=1
+    opt_level="O0"
 
 	python -m ipdb finetune_pt_lm.py \
         --model_name ${model} \
@@ -72,7 +73,10 @@ function train_nlg() {
         --gradient_accumulation_steps ${grad_accum} \
         --learning_rate ${learning_rate} \
         --num_train_epochs ${n_epochs} \
-        --patience ${patience} #\
+        --patience ${patience} \
+        --local_rank 0 \
+        --fp16 --fp16_opt_level ${opt_level}
+        #--use_one_gpu
         #--reload_data
 }
 
