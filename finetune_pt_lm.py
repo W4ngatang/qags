@@ -39,6 +39,7 @@ from pytorch_transformers import OpenAIGPTDoubleHeadsModel, OpenAIGPTLMHeadModel
                                  AdamW, WEIGHTS_NAME, CONFIG_NAME, \
                                  GPT2DoubleHeadsModel, GPT2LMHeadModel, GPT2Tokenizer
 from pytorch_transformers.optimization import WarmupLinearSchedule
+from pt_gen_utils import top_k_top_p_filtering, generate
 
 
 MC_TASK_NAMES = {'rocstories'}
@@ -78,7 +79,7 @@ def load_data_and_tokenize(data_dir, split, task_name, special2toks):
             for line in tqdm(f):
                 examples.append((' '.join(line[1:5]), line[5], line[6], int(line[-1])-1))
 
-    elif task_name == "squad-freetext":
+    elif task_name in ["squad-qa-freetext", "squad-qg"]:
         with open(f'{data_dir}/{split}.json', encoding="utf-8") as f:
             data = json.load(f)["data"]
 
@@ -113,7 +114,7 @@ def index(tokenizer, obj):
 
 
 def tensorfy(data, max_seq_len, task_name, special2idx,
-             no_input_lm=False, eoi_idx=None):
+             no_input_lm=False, eoi_idx=None, no_labels=False):
     """ Convert indexed dataset into tensors
 
     args:
@@ -157,7 +158,7 @@ def tensorfy(data, max_seq_len, task_name, special2idx,
             mc_labels[i] = mc_label
         all_inputs = (input_ids, mc_token_ids, lm_labels, mc_labels)
 
-    elif task_name == 'squad-freetext':
+    elif task_name == 'squad-qa-freetext':
         sos_idx = special2idx['sos_tok']
         delim_idx = special2idx['delim_tok']
         max_ans_len = max(len(ans) for _, _, ans in data)
@@ -166,7 +167,29 @@ def tensorfy(data, max_seq_len, task_name, special2idx,
         input_ids = np.zeros((n_batch, 1, input_len), dtype=np.int64)
         lm_labels = np.full((n_batch, 1, input_len), fill_value=-1, dtype=np.int64)
         for i, (qst, psg, ans) in enumerate(data):
-            ex = [sos_idx] + qst[:cap_len] + [delim_idx] + psg[:cap_len] + [eoi_idx] + ans + [eoi_idx]
+            if no_labels:
+                ex = [sos_idx] + qst[:cap_len] + [delim_idx] + psg[:cap_len] + [eoi_idx]
+            else:
+                ex = [sos_idx] + qst[:cap_len] + [delim_idx] + psg[:cap_len] + [eoi_idx] + ans + [eoi_idx]
+            input_ids[i, 0, :len(ex)] = ex
+            if no_input_lm:
+                assert eoi_idx is not None and eoi_idx in ex, f'end of input token {eoi_tok} not in example {ex}'
+                first_output_index = ex.index(eoi_idx) + 1
+                lm_labels[i, 0, first_output_index: len(ex)] = ex[first_output_index: len(ex)]
+            else:
+                lm_labels[i, 0, :len(ex)] = ex
+        all_inputs = (input_ids,) if no_labels else (input_ids, lm_labels)
+
+    elif task_name == 'squad-qg':
+        sos_idx = special2idx['sos_tok']
+        delim_idx = special2idx['delim_tok']
+        max_ans_len = max(len(ans) for _, _, ans in data)
+        cap_len = (max_seq_len - max_ans_len) // 2
+        input_len = max(len(qst[:cap_len]) + len(psg[:cap_len]) + len(ans) + 4 for qst, psg, ans in data)
+        input_ids = np.zeros((n_batch, 1, input_len), dtype=np.int64)
+        lm_labels = np.full((n_batch, 1, input_len), fill_value=-1, dtype=np.int64)
+        for i, (qst, psg, ans) in enumerate(data):
+            ex = [sos_idx] + ans[:cap_len] + [delim_idx] + psg[:cap_len] + [eoi_idx] + qst + [eoi_idx]
             input_ids[i, 0, :len(ex)] = ex
             if no_input_lm:
                 assert eoi_idx is not None and eoi_idx in ex, f'end of input token {eoi_tok} not in example {ex}'
@@ -187,16 +210,15 @@ def tensorfy(data, max_seq_len, task_name, special2idx,
                 lm_labels[i, 0, first_output_index: len(seq)] = seq[first_output_index: len(seq)]
             else:
                 lm_labels[i, 0, :len(seq)] = seq
-        all_inputs = (input_ids, lm_labels)
+        all_inputs = (input_ids,) if no_labels else (input_ids, lm_labels)
 
     return tuple(torch.tensor(t) for t in all_inputs)
 
 
-def create_loader(data, batch_size):
+def create_loader(data, batch_size, use_distributed):
     """ """
     dataset = TensorDataset(*data)
-    #sampler = RandomSampler(dataset)
-    sampler = DistributedSampler(dataset)
+    sampler = DistributedSampler(dataset) if use_distributed else RandomSampler(dataset)
     data_loader = DataLoader(dataset, sampler=sampler, batch_size=batch_size)
     return data_loader
 
@@ -313,6 +335,7 @@ def setup(outdir, seed, overwrite_output_dir):
     log_fh.setFormatter(log_fmt)
     log.getLogger().addHandler(log_fh)
 
+
 def main(arguments):
     parser = argparse.ArgumentParser()
 
@@ -324,9 +347,10 @@ def main(arguments):
     parser.add_argument('--seed', type=int, default=42)
 
     # CUDA / GPU options
+    parser.add_argument('--world_size', type=int, default=1, help='world_size for distributed training on gpus')
     parser.add_argument('--local_rank', type=int, default=-1, help='local_rank for distributed training on gpus')
-    parser.add_argument('--no_cuda', action='store_true', default=False, help='turn on to use cpu')
-    parser.add_argument('--use_one_gpu', action='store_true', default=False, help='only use one GPU, even if multiple are available')
+    parser.add_argument('--use_cpu', action='store_true', default=False, help='turn on to use cpu')
+    parser.add_argument('--use_only_gpuid', type=int, default=-1, help='if >=0, only use that GPU')
 
     # FP16 stuff
     parser.add_argument('--fp16', action='store_true', help="Whether to use 16-bit float precision instead of 32-bit")
@@ -336,6 +360,7 @@ def main(arguments):
                              "Positive power of 2: static loss scaling value.\n")
     parser.add_argument('--fp16_opt_level', type=str, choices=['O0', 'O1', 'O2', 'O3'],
                         default='O2', help="Level of optimizations when using fp16")
+    parser.add_argument('--fp16_keep_bn_fp32', action='store_true', help="If true and opt_level = O3, set bn to fp16")
 
     # Preprocessing options
     parser.add_argument('--reload_data', action='store_true')
@@ -344,9 +369,10 @@ def main(arguments):
     parser.add_argument('--model_name', default='gpt2', type=str, choices=['gpt2', 'gpt2-medium', 'openai-gpt'],
                         help='model name')
     parser.add_argument("--task_name", default=None, type=str, required=True, help="The name of the task to train.",
-                        choices=['rocstories', 'squad.sf-q', 'squad-freetext'])
+                        choices=['rocstories', 'squad.sf-q', 'squad-qa-freetext'])
 
     # Training details
+    parser.add_argument('--skip_training', action='store_true', default=False)
     parser.add_argument('--num_train_epochs', type=int, default=3)
     parser.add_argument('--train_batch_size', type=int, default=32)
     parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
@@ -370,25 +396,28 @@ def main(arguments):
     setup(outdir=args.out_dir, seed=args.seed, overwrite_output_dir=args.overwrite_output_dir)
 
     # GPU stuff
-
-    if args.local_rank == -1 or args.use_one_gpu or args.no_cuda:
-        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-        n_gpu = torch.cuda.device_count()
-    else:
-        torch.cuda.set_device(args.local_rank)
-        device = torch.device("cuda", args.local_rank)
+    assert not ((args.local_rank != -1 and args.use_only_gpuid >= 0) or
+                (args.local_rank != -1 and args.use_cpu) or
+                (args.use_only_gpuid >= 0 and args.use_cpu)), "Invalid GPU settings detected!"
+    if args.use_cpu: # cpu
+        device = torch.device("cpu")
+    elif args.use_only_gpuid >= 0: # single gpu
+        device = torch.device("cuda", args.use_only_gpuid)
         n_gpu = 1
-
+    elif args.local_rank == -1: # multi-gpu
+        device = torch.device("cuda")
+        n_gpu = torch.cuda.device_count()
+    else: # distributed
         os.environ['MASTER_ADDR'] = 'localhost'
         os.environ['MASTER_PORT'] = '12355'
-        torch.distributed.init_process_group(backend='nccl', world_size=1, rank=args.local_rank)
 
-        world_size=8
-        mp.spawn(proc, args=(world_size,),
-                 nprocs=world_size, join=True)
-
+        torch.cuda.set_device(args.local_rank)
+        device = torch.device("cuda", args.local_rank)
+        torch.distributed.init_process_group(backend='nccl', world_size=args.world_size, rank=args.local_rank)
+        n_gpu = 1 # force a single process per GPU
     log.info("device: {}, n_gpu {}, 16-bits training: {}".format(device, n_gpu, args.fp16))
 
+    # Training stuff
     assert args.gradient_accumulation_steps >= 1, f"gradient_accumulation_steps should be >= 1, found {args.gradient_accumulation_steps}"
     train_batch_size = args.train_batch_size // args.gradient_accumulation_steps
     eval_batch_size = 1 * args.train_batch_size
@@ -402,7 +431,7 @@ def main(arguments):
                           'delim_tok': '_delimiter_',
                           'clf_tok': '_classify_'
                          }
-    elif args.task_name == "squad-freetext":
+    elif args.task_name == "squad-qa-freetext":
         special_tokens = {'sos_tok': '_start_',
                           'delim_tok': '_delimiter_',
                           'eos_tok': '_answer_',
@@ -418,15 +447,21 @@ def main(arguments):
     n_positions = model.config.n_positions
     model.to(device)
 
-
     # Preprocess or load cached preprocessed data by
     # 1) load data and tokenize
     # 2) index the data
     # 3) tensorfy the data
     # 4) create data loaders
-    splits = ["train", "dev"]
+    splits = ["train", "dev", "train-src", "dev-src"]
     split2data = {}
-    for split in splits:
+    for split_name in splits:
+        if split_name.endswith("src"):
+            split = split.split("-")[0]
+            no_labels = True
+        else:
+            split = split_name
+            no_labels = False
+
         cached_data_file = f'{args.out_dir}/{args.task_name}.indexed_data.{split}.json'
         if os.path.exists(cached_data_file) and not args.reload_data:
             log.info(f"Task {args.task_name}: loading {split} from {cached_data_file}...")
@@ -443,151 +478,174 @@ def main(arguments):
             with open(cached_data_file, 'w') as f:
                 json.dump(idx_data, f)
 
-        no_input_lm = args.no_input_lm_train if split == "train" else args.no_input_lm_eval
+        no_input_lm = (args.no_input_lm_train if split == "train" else args.no_input_lm_eval) or (no_labels)
         tsr_data = tensorfy(idx_data,
                             max_seq_len=n_positions,
                             task_name=task_name,
                             special2idx=special_tokens_ids,
                             no_input_lm=no_input_lm,
-                            eoi_idx=special_tokens_ids['eos_tok'])
+                            eoi_idx=special_tokens_ids['eos_tok'],
+                            no_labels=no_labels)
 
         batch_size = train_batch_size if split == "train" else eval_batch_size
-        split2data[split] = create_loader(tsr_data, batch_size)
+        split2data[split_name] = create_loader(tsr_data, batch_size, bool(args.local_rank > -1))
     train_dataloader = split2data["train"]
     eval_dataloader = split2data["dev"]
 
     # Prepare optimizer
     optimizer, scheduler = get_optimizer_and_scheduler(model, train_dataloader, args)
 
-    # FP16 stuff
+
+    # Failed attempt to launch process within python script
+    #mp.spawn(train,
+    #         args=(world_size, model, optimizer),
+    #         nprocs=world_size, join=True)
+
+    # FP16 stuff and distributed stuff
     # Move to DataParallel after amp
     if args.fp16:
         try:
             from apex import amp, optimizers
         except ImportError:
             raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-        model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level,
-                                          keep_batchnorm_fp32=True)
-    if args.local_rank != -1 and not args.use_one_gpu:
+        if args.fp16_opt_level == "O3" and not args.fp16_keep_bn_fp32:
+            keep_bn_fp32 = False
+        else:
+            keep_bn_fp32 = True if args.fp16_opt_level in ["O3", "O2"] else None
+        model, optimizer = amp.initialize(model, optimizer,
+                                          opt_level=args.fp16_opt_level,
+                                          keep_batchnorm_fp32=keep_bn_fp32)
+    if args.local_rank != -1: # distributed
         model = DistributedDataParallel(model, device_ids=[args.local_rank])
-    elif not args.use_one_gpu:
+    elif args.use_only_gpuid == -1: # multi-gpu
         model = torch.nn.parallel.DataParallel(model)
 
     # Train loop
-    tb_writer = SummaryWriter(args.out_dir)
-    global_step, nb_tr_example_visits, best_eval_loss = 0, 0, float('inf')
-    patience_left = args.patience
-    start_time = time.time()
-    for epoch_no in trange(int(args.num_train_epochs), desc="Epoch"):
-        model.train()
-        tr_loss, tr_batch_loss, nb_tr_steps = 0, 0, 0
-        tqdm_bar = tqdm(train_dataloader, desc="Training")
-        for step, batch in enumerate(tqdm_bar):
-            batch = tuple(t.to(device) for t in batch)
-            if args.task_name in MC_TASK_NAMES:
-                input_ids, mc_token_ids, lm_labels, mc_labels = batch
-                outs = model(input_ids, mc_token_ids, lm_labels, mc_labels)
-                loss = args.lm_coef * outs[0] + outs[1]
-                nb_tr_steps += 1
-            else:
-                input_ids, lm_labels = batch
-                outs = model(input_ids, labels=lm_labels)
-                loss = outs[0]
-                nb_tr_steps += len(lm_labels[lm_labels != -1])
-
-            if args.gradient_accumulation_steps > 1:
-                loss = loss / args.gradient_accumulation_steps
-
-            if n_gpu > 1: # if using multiple GPUs
-                loss = loss.sum()
-            if args.fp16:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                loss.backward()
-
-            tr_loss += loss.item()
-            tr_batch_loss += loss.item()
-            nb_tr_example_visits += input_ids.size(0)
-            if (step + 1) % args.gradient_accumulation_steps == 0:
-                if args.fp16:
-                    # modify learning rate with special warm up BERT uses
-                    # if args.fp16 is False, BertAdam is used that handles this automatically
-                    lr_this_step = args.learning_rate * scheduler.get_lr()[0] #global_step, args.warmup_proportion)
-                    for param_group in optimizer.param_groups:
-                        param_group['lr'] = lr_this_step
-                optimizer.step()
-                scheduler.step()
-                optimizer.zero_grad()
-                global_step += 1
-                tb_writer.add_scalar('lr', scheduler.get_lr()[0], nb_tr_example_visits)
-                tb_writer.add_scalar('loss', tr_batch_loss, nb_tr_example_visits)
-                tqdm_bar.desc = "Training loss: {:.2e} lr: {:.2e}".format(tr_batch_loss, scheduler.get_lr()[0])
-                tr_batch_loss = 0
-
-        # Validation
-        model.eval()
-        eval_loss, eval_accuracy = 0, 0
-        nb_eval_steps, nb_eval_examples = 0, 0
-        for batch in tqdm(eval_dataloader, desc="Evaluating"):
-            batch = tuple(t.to(device) for t in batch)
-            if args.task_name in MC_TASK_NAMES:
-                input_ids, mc_token_ids, lm_labels, mc_labels = batch
-                with torch.no_grad(): # NOTE(Alex): this is probably broken
+    if not args.skip_training:
+        tb_writer = SummaryWriter(args.out_dir)
+        global_step, nb_tr_example_visits, best_eval_loss = 0, 0, float('inf')
+        patience_left = args.patience
+        start_time = time.time()
+        for epoch_no in trange(int(args.num_train_epochs), desc="Epoch"):
+            model.train()
+            tr_loss, tr_batch_loss, nb_tr_steps = 0, 0, 0
+            data_iterator = train_dataloader if args.local_rank > 0 else tqdm(train_dataloader, desc="Training")
+            #data_iterator = tqdm(train_dataloader, desc="Training")
+            for step, batch in enumerate(data_iterator):
+                batch = tuple(t.to(device) for t in batch)
+                if args.task_name in MC_TASK_NAMES:
+                    input_ids, mc_token_ids, lm_labels, mc_labels = batch
                     outs = model(input_ids, mc_token_ids, lm_labels, mc_labels)
-                    lm_loss, mc_loss = outs[0], outs[1]
-                    eval_batch_loss = args.lm_coef * lm_loss + mc_loss
-                    mc_logits = model(input_ids, mc_token_ids)[1]
-
-                mc_logits = mc_logits.detach().cpu().numpy()
-                mc_labels = mc_labels.to('cpu').numpy()
-                tmp_eval_accuracy = accuracy(mc_logits, mc_labels)
-
-                eval_loss += eval_batch_loss.mean().item()
-                eval_accuracy += tmp_eval_accuracy
-                nb_eval_steps += 1
-            else:
-                input_ids, lm_labels = batch
-                with torch.no_grad():
+                    loss = args.lm_coef * outs[0] + outs[1]
+                    nb_tr_steps += 1
+                else:
+                    input_ids, lm_labels = batch
                     outs = model(input_ids, labels=lm_labels)
-                    lm_loss = outs[0]
+                    loss = outs[0]
+                    nb_tr_steps += len(lm_labels[lm_labels != -1])
 
-                eval_loss += lm_loss.mean().item()
-                nb_eval_steps += 1 #len(lm_labels[lm_labels != -1])
+                if args.gradient_accumulation_steps > 1:
+                    loss = loss / args.gradient_accumulation_steps
 
-            nb_eval_examples += input_ids.size(0)
+                if n_gpu > 1: # if using multiple GPUs
+                    loss = loss.sum()
+                if args.fp16:
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    loss.backward()
 
-        eval_loss /= nb_eval_steps
-        tb_writer.add_scalar('eval_loss', eval_loss, nb_tr_example_visits)
-        result = {'eval_loss': eval_loss,
-                  'train_loss': tr_loss / (nb_tr_steps / float(args.gradient_accumulation_steps))}
-        if args.task_name in MC_TASK_NAMES:
-            result['eval_accuracy'] = eval_accuracy / nb_eval_examples
+                tr_loss += loss.item()
+                tr_batch_loss += loss.item()
+                nb_tr_example_visits += input_ids.size(0)
+                if (step + 1) % args.gradient_accumulation_steps == 0:
+                    if args.fp16:
+                        # modify learning rate with special warm up BERT uses
+                        # if args.fp16 is False, BertAdam is used that handles this automatically
+                        lr_this_step = args.learning_rate * scheduler.get_lr()[0] #global_step, args.warmup_proportion)
+                        for param_group in optimizer.param_groups:
+                            param_group['lr'] = lr_this_step
+                    optimizer.step()
+                    scheduler.step()
+                    optimizer.zero_grad()
+                    global_step += 1
+                    tb_writer.add_scalar('lr', scheduler.get_lr()[0], nb_tr_example_visits)
+                    tb_writer.add_scalar('loss', tr_batch_loss, nb_tr_example_visits)
+                    if args.local_rank <= 0:
+                        data_iterator.desc = "Training loss: {:.2e} lr: {:.2e}".format(tr_batch_loss, scheduler.get_lr()[0])
+                    tr_batch_loss = 0
 
-        output_eval_file = os.path.join(args.out_dir, "eval_results_{}.txt".format(epoch_no))
-        with open(output_eval_file, "w") as writer:
-            log.info("***** Eval results *****")
-            for key in sorted(result.keys()):
-                log.info("  %s = %s", key, str(result[key]))
-                writer.write("%s = %s\n" % (key, str(result[key])))
+            # Validation
+            model.eval()
+            eval_loss, eval_accuracy = 0, 0
+            nb_eval_steps, nb_eval_examples = 0, 0
+            data_iterator = eval_dataloader if args.local_rank > 0 else tqdm(eval_dataloader, desc="Evaluating")
+            #data_iterator = tqdm(eval_dataloader, desc="Evaluating")
+            for batch in data_iterator:
+                batch = tuple(t.to(device) for t in batch)
+                if args.task_name in MC_TASK_NAMES:
+                    input_ids, mc_token_ids, lm_labels, mc_labels = batch
+                    with torch.no_grad(): # NOTE(Alex): this is probably broken
+                        outs = model(input_ids, mc_token_ids, lm_labels, mc_labels)
+                        lm_loss, mc_loss = outs[0], outs[1]
+                        eval_batch_loss = args.lm_coef * lm_loss + mc_loss
+                        mc_logits = model(input_ids, mc_token_ids)[1]
 
-        # Model saving and early stopping
-        log.info(f'Epoch {epoch_no + 1} complete!')
-        if eval_loss < best_eval_loss:
-            print('Best loss so far! {} -> {}'.format(best_eval_loss, eval_loss))
-            best_eval_loss = eval_loss
-            save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), True)
-            patience_left = args.patience
-        else:
-            print('Loss up from best epoch: {} -> {}'.format(best_eval_loss, eval_loss))
-            save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), False)
-            patience_left -= 1
-            if patience_left <= 0:
-                print('Ran out of patience. Stopping training.')
-                break
+                    mc_logits = mc_logits.detach().cpu().numpy()
+                    mc_labels = mc_labels.to('cpu').numpy()
+                    tmp_eval_accuracy = accuracy(mc_logits, mc_labels)
 
-    print('Completed training in {}s!'.format(time.time() - start_time))
+                    eval_loss += eval_batch_loss.mean().item()
+                    eval_accuracy += tmp_eval_accuracy
+                    nb_eval_steps += 1
+                else:
+                    input_ids, lm_labels = batch
+                    with torch.no_grad():
+                        outs = model(input_ids, labels=lm_labels)
+                        lm_loss = outs[0]
 
+                    eval_loss += lm_loss.item()
+                    nb_eval_steps += len(lm_labels[lm_labels != -1])
+
+                nb_eval_examples += input_ids.size(0)
+
+            eval_loss /= nb_eval_steps
+            tb_writer.add_scalar('eval_loss', eval_loss, nb_tr_example_visits)
+            result = {'eval_loss': eval_loss,
+                      'train_loss': tr_loss / (nb_tr_steps / float(args.gradient_accumulation_steps))}
+            if args.task_name in MC_TASK_NAMES:
+                result['eval_accuracy'] = eval_accuracy / nb_eval_examples
+
+            output_eval_file = os.path.join(args.out_dir, "eval_results_{}.txt".format(epoch_no))
+            with open(output_eval_file, "w") as writer:
+                log.info("***** Eval results *****")
+                for key in sorted(result.keys()):
+                    log.info("  %s = %s", key, str(result[key]))
+                    writer.write("%s = %s\n" % (key, str(result[key])))
+
+            # Model saving and early stopping
+            log.info(f'Epoch {epoch_no + 1} complete!')
+            if eval_loss < best_eval_loss:
+                print('Best loss so far! {} -> {}'.format(best_eval_loss, eval_loss))
+                best_eval_loss = eval_loss
+                save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), True)
+                patience_left = args.patience
+            else:
+                print('Loss up from best epoch: {} -> {}'.format(best_eval_loss, eval_loss))
+                save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), False)
+                patience_left -= 1
+                if patience_left <= 0:
+                    print('Ran out of patience. Stopping training.')
+                    break
+
+        log.info('Completed training in {}s!'.format(time.time() - start_time))
+    else:
+        log.info('Skipping training')
+
+    if task_name in ['squad-qa-freetext', 'squad-qg']:
+        eval_src_data = split2data["dev-src"]
+        gens = generate(model=model, data=eval_src_data, device=device, batch_size=eval_batch_size)
+        import ipdb; ipdb.set_trace()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

@@ -55,29 +55,54 @@ function train_nlg() {
 	out_dir="/checkpoint/wangalexc/ppb/${model}/squadv2_0_freetext/${date}"
     mkdir -p ${out_dir}
 
-    batch_size=8
+    task="squad-qa-freetext"
+    batch_size=1
     grad_accum=1
     learning_rate=.001
-    n_epochs=3
+    n_epochs=10
     patience=1
-    opt_level="O0"
+    opt_level="O3"
+    use_distributed=0
+    world_size=8
 
-	python -m ipdb finetune_pt_lm.py \
-        --model_name ${model} \
-        --task_name squad-freetext \
-	    --data_dir ${data_dir} \
-	    --out_dir ${out_dir} \
-        --overwrite_output_dir \
-        --no_input_lm_train \
-        --train_batch_size ${batch_size} \
-        --gradient_accumulation_steps ${grad_accum} \
-        --learning_rate ${learning_rate} \
-        --num_train_epochs ${n_epochs} \
-        --patience ${patience} \
-        --local_rank 0 \
-        --fp16 --fp16_opt_level ${opt_level}
-        #--use_one_gpu
-        #--reload_data
+    if [ ${use_distributed} -eq 1 ]; then
+        python -m torch.distributed.launch --nproc_per_node=${world_size} finetune_pt_lm.py \
+            --model_name ${model} \
+            --task_name ${task} \
+            --data_dir ${data_dir} \
+            --out_dir ${out_dir} \
+            --overwrite_output_dir \
+            --no_input_lm_eval \
+            --train_batch_size ${batch_size} \
+            --gradient_accumulation_steps ${grad_accum} \
+            --learning_rate ${learning_rate} \
+            --num_train_epochs ${n_epochs} \
+            --patience ${patience} \
+            --fp16 --fp16_opt_level ${opt_level} \
+            --world_size ${world_size}
+            #--reload_data
+            #--no_input_lm_train \
+
+    else
+        python -m ipdb finetune_pt_lm.py \
+            --model_name ${model} \
+            --task_name ${task} \
+            --data_dir ${data_dir} \
+            --out_dir ${out_dir} \
+            --overwrite_output_dir \
+            --no_input_lm_eval \
+            --train_batch_size ${batch_size} \
+            --gradient_accumulation_steps ${grad_accum} \
+            --learning_rate ${learning_rate} \
+            --num_train_epochs ${n_epochs} \
+            --patience ${patience} \
+            --fp16 --fp16_opt_level ${opt_level} \
+            --skip_training
+            #--no_input_lm_train \
+            #--use_one_gpu
+            #--reload_data
+    fi
+
 }
 
 function evaluate_v1_1() {
