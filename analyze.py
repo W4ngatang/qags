@@ -180,11 +180,14 @@ def compute_text_stats(stat_names, txts, refs, max_n=4):
 def main(arguments):
 
     #mdls = ["tfmr", "lstm", "lstmsmall", "lstmsmalltied"]
-    txt_files = [f"/private/home/wangalexc/data/cnndailymail/fseq/onmt-models/{mdl}-beam10.cnndm.test.txt" for mdl in mdls]
-    ref_file = "/private/home/wangalexc/data/cnndailymail/fseq/onmt-models/src.cnndm.test.txt"
+    #txt_files = [f"/private/home/wangalexc/data/cnndailymail/fseq/onmt-models/{mdl}-beam10.cnndm.test.txt" for mdl in mdls]
+    #ref_file = "/private/home/wangalexc/data/cnndailymail/fseq/onmt-models/src.cnndm.test.txt"
 
     #txt_files = [f"/private/home/wangalexc/data/cnndailymail/fseq/gen.cnndm.test.txt"]
     #ref_file = f"/private/home/wangalexc/data/cnndailymail/fseq/src.cnndm.test.txt"
+
+    txt_files = [f"/checkpoint/wangalexc/onmt/bottoms-up-summarization/bottom_up_cnndm.shuf.notags.out"]
+    ref_file = f"/checkpoint/wangalexc/onmt/bottoms-up-summarization/test.txt.src.tagged.shuf.400words"
 
     refs = load_txt(ref_file)
     for txt_file in txt_files:

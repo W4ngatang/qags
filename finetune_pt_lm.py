@@ -25,6 +25,7 @@ import time
 import shutil
 import random
 import argparse
+import itertools
 
 from tqdm import tqdm, trange
 
@@ -32,6 +33,7 @@ import spacy
 import numpy as np
 import torch
 import torch.multiprocessing as mp
+import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset, DistributedSampler)
 from tensorboardX import SummaryWriter
@@ -44,6 +46,10 @@ from pt_gen_utils import top_k_top_p_filtering, generate
 
 MC_TASK_NAMES = {'rocstories'}
 
+
+def _log(msg, local_rank):
+    if local_rank <= 0:
+        log.info(msg)
 
 def accuracy(out, labels):
     outputs = np.argmax(out, axis=1)
@@ -161,10 +167,11 @@ def tensorfy(data, max_seq_len, task_name, special2idx,
     elif task_name == 'squad-qa-freetext':
         sos_idx = special2idx['sos_tok']
         delim_idx = special2idx['delim_tok']
+        pad_idx = special2idx['pad_tok']
         max_ans_len = max(len(ans) for _, _, ans in data)
         cap_len = (max_seq_len - max_ans_len) // 2
         input_len = max(len(qst[:cap_len]) + len(psg[:cap_len]) + len(ans) + 4 for qst, psg, ans in data)
-        input_ids = np.zeros((n_batch, 1, input_len), dtype=np.int64)
+        input_ids = np.ones((n_batch, 1, input_len), dtype=np.int64) * pad_idx
         lm_labels = np.full((n_batch, 1, input_len), fill_value=-1, dtype=np.int64)
         for i, (qst, psg, ans) in enumerate(data):
             if no_labels:
@@ -183,10 +190,11 @@ def tensorfy(data, max_seq_len, task_name, special2idx,
     elif task_name == 'squad-qg':
         sos_idx = special2idx['sos_tok']
         delim_idx = special2idx['delim_tok']
+        pad_idx = special2idx['pad_tok']
         max_ans_len = max(len(ans) for _, _, ans in data)
         cap_len = (max_seq_len - max_ans_len) // 2
         input_len = max(len(qst[:cap_len]) + len(psg[:cap_len]) + len(ans) + 4 for qst, psg, ans in data)
-        input_ids = np.zeros((n_batch, 1, input_len), dtype=np.int64)
+        input_ids = np.ones((n_batch, 1, input_len), dtype=np.int64) * pad_idx
         lm_labels = np.full((n_batch, 1, input_len), fill_value=-1, dtype=np.int64)
         for i, (qst, psg, ans) in enumerate(data):
             ex = [sos_idx] + ans[:cap_len] + [delim_idx] + psg[:cap_len] + [eoi_idx] + qst + [eoi_idx]
@@ -223,7 +231,7 @@ def create_loader(data, batch_size, use_distributed):
     return data_loader
 
 
-def get_model_tokenizer(model_name, special_tokens):
+def get_model_tokenizer(model_name, special_tokens, load_from_dir=None):
     """ Returns a tokenizer's Python class """
     if model_name == 'openai-gpt':
         tokenizer_cls = OpenAIGPTTokenizer
@@ -231,14 +239,17 @@ def get_model_tokenizer(model_name, special_tokens):
         tokenizer_cls = GPT2Tokenizer
     else:
         raise ValueError(f"Invalid model class {model_name}")
-    tokenizer = tokenizer_cls.from_pretrained(model_name)
+    if load_from_dir is not None:
+        tokenizer = tokenizer_cls.from_pretrained(load_from_dir)
+    else:
+        tokenizer = tokenizer_cls.from_pretrained(model_name)
     if model_name in ['gpt2', 'gpt2-medium']: # HACK
         tokenizer.unk_token = tokenizer.eos_token
     tokenizer.add_special_tokens(special_tokens)
     return tokenizer
 
 
-def get_pretrained_model(model_name, task_name, tokenizer):
+def get_pretrained_model(model_name, task_name, tokenizer, load_from_dir=None):
     """ Returns a model's Python class """
     if task_name in MC_TASK_NAMES:
         if model_name == 'openai-gpt':
@@ -250,7 +261,10 @@ def get_pretrained_model(model_name, task_name, tokenizer):
             mdl_cls = OpenAIGPTLMHeadModel
         else:
             mdl_cls = GPT2LMHeadModel
-    model = mdl_cls.from_pretrained(model_name)
+    if load_from_dir is not None:
+        model = mdl_cls.from_pretrained(load_from_dir)
+    else:
+        model = mdl_cls.from_pretrained(model_name)
     model.resize_token_embeddings(len(tokenizer))
     return model
 
@@ -277,16 +291,16 @@ def get_optimizer_and_scheduler(model, data, args):
     return optimizer, scheduler
 
 
-def load_model(saved_dir):
-    """ Loads a previously saved model """
-    output_args_file = os.path.join(saved_dir, 'training_args.bin')
-    args = torch.load(output_args_file)
-    print('Loaded args:', args)
-    tokenizer_class = get_tokenizer_class(args.model_name)
-    tokenizer = tokenizer_class.from_pretrained(saved_dir)
-    model_class = get_model_class(args.model_name, args.task_name)
-    model = model_class.from_pretrained(saved_dir)
-    return model, tokenizer, args
+def load_model(saved_dir, model_name, task_name, special_tokens, device):
+    """ Loads a previously saved model and tokenizer using current args """
+    #output_args_file = os.path.join(saved_dir, 'training_args.bin')
+    #args = torch.load(output_args_file)
+    #log.info(f'Loaded args from {saved_dir}: {args}')
+    log.info(f'Loading model and tokenizer from {saved_dir}')
+    tokenizer = get_model_tokenizer(model_name, special_tokens, saved_dir)
+    model = get_pretrained_model(model_name, task_name, tokenizer, saved_dir)
+    model = model.to(device)
+    return model, tokenizer
 
 
 def save_model(model, tokenizer, args, out_dir, weights_name=WEIGHTS_NAME, override_default_weights=True):
@@ -295,9 +309,9 @@ def save_model(model, tokenizer, args, out_dir, weights_name=WEIGHTS_NAME, overr
     model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
 
     # If we save using the predefined names, we can load using `from_pretrained`
-    output_model_file = os.path.join( out_dir, weights_name)
+    output_model_file = os.path.join(out_dir, weights_name)
     output_default_model_file = os.path.join(out_dir, WEIGHTS_NAME)
-    output_config_file = os.path.join( out_dir, CONFIG_NAME)
+    output_config_file = os.path.join(out_dir, CONFIG_NAME)
 
     torch.save(model_to_save.state_dict(), output_model_file)
     if override_default_weights:
@@ -311,7 +325,7 @@ def save_model(model, tokenizer, args, out_dir, weights_name=WEIGHTS_NAME, overr
     return
 
 
-def setup(outdir, seed, overwrite_output_dir):
+def setup(outdir, seed, local_rank):
     """ Setup """
 
     # Seeding
@@ -323,17 +337,14 @@ def setup(outdir, seed, overwrite_output_dir):
     # Output directory
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-    #elif overwrite_output_dir:
-    #    log.info(f'Overwriting existing output directory {outdir}')
-    #    shutil.rmtree(outdir)
-    #    os.makedirs(outdir)
 
     # Log file
-    log_file = os.path.join(outdir, "train.log")
-    log_fh = log.FileHandler(log_file)
-    log_fmt = log.Formatter("%(asctime)s: %(message)s", datefmt="%m/%d %I:%M:%S %p")
-    log_fh.setFormatter(log_fmt)
-    log.getLogger().addHandler(log_fh)
+    if local_rank <= 0:
+        log_file = os.path.join(outdir, "train.log")
+        log_fh = log.FileHandler(log_file)
+        log_fmt = log.Formatter("%(asctime)s: %(message)s", datefmt="%m/%d %I:%M:%S %p")
+        log_fh.setFormatter(log_fmt)
+        log.getLogger().addHandler(log_fh)
 
 
 def main(arguments):
@@ -342,8 +353,8 @@ def main(arguments):
     # logistics
     parser.add_argument('--data_dir', default='~/data', type=str, help='directory containing data')
     parser.add_argument('--out_dir', type=str, help='directory to write outputs')
-    parser.add_argument('--overwrite_output_dir', action='store_true',
-                        help="Overwrite the content of the output directory")
+    parser.add_argument('--load_model_from', type=str, help='directory to write outputs',
+                        default=None)
     parser.add_argument('--seed', type=int, default=42)
 
     # CUDA / GPU options
@@ -388,12 +399,11 @@ def main(arguments):
     parser.add_argument('--no_input_lm_train', action='store_true', help="Use LM loss on input while training?")
     parser.add_argument('--no_input_lm_eval', action='store_true', help="Use LM loss on input while evaluating?")
 
-
     args = parser.parse_args(arguments)
-    log.info(args)
+    _log(args, args.local_rank)
 
     # Logging and outputs
-    setup(outdir=args.out_dir, seed=args.seed, overwrite_output_dir=args.overwrite_output_dir)
+    setup(outdir=args.out_dir, seed=args.seed, local_rank=args.local_rank)
 
     # GPU stuff
     assert not ((args.local_rank != -1 and args.use_only_gpuid >= 0) or
@@ -420,7 +430,7 @@ def main(arguments):
     # Training stuff
     assert args.gradient_accumulation_steps >= 1, f"gradient_accumulation_steps should be >= 1, found {args.gradient_accumulation_steps}"
     train_batch_size = args.train_batch_size // args.gradient_accumulation_steps
-    eval_batch_size = 1 * args.train_batch_size
+    eval_batch_size = args.train_batch_size
     task_name = args.task_name
 
     # Load model tokenizer (since pretrained models have a particular vocabulary)
@@ -435,7 +445,8 @@ def main(arguments):
         special_tokens = {'sos_tok': '_start_',
                           'delim_tok': '_delimiter_',
                           'eos_tok': '_answer_',
-                          'no_ans_tok' :'__no_ans__'
+                          'no_ans_tok' :'__no_ans__',
+                          'pad_tok': '__pad__'
                          }
     else:
         special_tokens = []
@@ -464,17 +475,17 @@ def main(arguments):
 
         cached_data_file = f'{args.out_dir}/{args.task_name}.indexed_data.{split}.json'
         if os.path.exists(cached_data_file) and not args.reload_data:
-            log.info(f"Task {args.task_name}: loading {split} from {cached_data_file}...")
+            _log(f"Task {args.task_name}: loading {split} from {cached_data_file}...", args.local_rank)
             with open(cached_data_file, 'r') as f:
                 idx_data = json.load(f)
         else:
-            log.info(f"Task {args.task_name}: processing {split} from scratch...")
+            _log(f"Task {args.task_name}: processing {split} from scratch...", args.local_rank)
 
             tok_data = load_data_and_tokenize(args.data_dir, split, task_name, special_tokens)
 
             idx_data = index(tokenizer, tok_data)
 
-            log.info(f"\tSaving indexed data to {cached_data_file}...")
+            _log(f"\tSaving indexed data to {cached_data_file}...", args.local_rank)
             with open(cached_data_file, 'w') as f:
                 json.dump(idx_data, f)
 
@@ -487,7 +498,12 @@ def main(arguments):
                             eoi_idx=special_tokens_ids['eos_tok'],
                             no_labels=no_labels)
 
-        batch_size = train_batch_size if split == "train" else eval_batch_size
+        if split == "train":
+            batch_size = train_batch_size
+        elif split == "dev":
+            batch_size = 1 #eval_batch_size
+        elif split == "dev":
+            batch_size = 1
         split2data[split_name] = create_loader(tsr_data, batch_size, bool(args.local_rank > -1))
     train_dataloader = split2data["train"]
     eval_dataloader = split2data["dev"]
@@ -616,36 +632,59 @@ def main(arguments):
             if args.task_name in MC_TASK_NAMES:
                 result['eval_accuracy'] = eval_accuracy / nb_eval_examples
 
-            output_eval_file = os.path.join(args.out_dir, "eval_results_{}.txt".format(epoch_no))
-            with open(output_eval_file, "w") as writer:
-                log.info("***** Eval results *****")
-                for key in sorted(result.keys()):
-                    log.info("  %s = %s", key, str(result[key]))
-                    writer.write("%s = %s\n" % (key, str(result[key])))
+            if args.local_rank <= 0:
+                log.info(f'Epoch {epoch_no + 1} complete!')
 
-            # Model saving and early stopping
-            log.info(f'Epoch {epoch_no + 1} complete!')
-            if eval_loss < best_eval_loss:
-                print('Best loss so far! {} -> {}'.format(best_eval_loss, eval_loss))
-                best_eval_loss = eval_loss
-                save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), True)
-                patience_left = args.patience
-            else:
-                print('Loss up from best epoch: {} -> {}'.format(best_eval_loss, eval_loss))
-                save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), False)
-                patience_left -= 1
-                if patience_left <= 0:
-                    print('Ran out of patience. Stopping training.')
-                    break
+                # Write eval results
+                output_eval_file = os.path.join(args.out_dir, "eval_results_{}.txt".format(epoch_no))
+                with open(output_eval_file, "w") as writer:
+                    log.info("***** Eval results *****")
+                    for key in sorted(result.keys()):
+                        log.info("  %s = %s", key, str(result[key]))
+                        writer.write("%s = %s\n" % (key, str(result[key])))
 
-        log.info('Completed training in {}s!'.format(time.time() - start_time))
+                # Model saving and early stopping
+                if eval_loss < best_eval_loss:
+                    log.info('Best loss so far! {} -> {}'.format(best_eval_loss, eval_loss))
+                    best_eval_loss = eval_loss
+                    patience_left = args.patience
+                    save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), True)
+                else:
+                    log.info('Loss up from best epoch: {} -> {}'.format(best_eval_loss, eval_loss))
+                    save_model(model, tokenizer, args, args.out_dir, 'model_epoch_{}.bin'.format(epoch_no), False)
+                    patience_left -= 1
+                    if patience_left <= 0:
+                        print('Ran out of patience. Stopping training.')
+                        break
+
+            # only do eval logging stuff on master process
+            # throw barrier to let it catch up to other processes
+            if args.world_size > 1:
+                dist.barrier()
+
+        _log('Completed training in {}s!'.format(time.time() - start_time), args.local_rank)
     else:
         log.info('Skipping training')
 
+    # Load best model or specified model
+    if args.load_model_from is not None:
+        load_dir = args.load_model_from
+    elif not args.skip_training:
+        load_dir = args.out_dir
+    else: # look in out_dir for checkpoints from previoous runs
+        load_dir = args.out_dir
+        #assert False, "Trying to generate from untrained model"
+    log.info(f"Loading model from {load_dir}")
+    model, _ = load_model(load_dir, args.model_name, task_name, special_tokens, device)
+
+    # Evaluate
     if task_name in ['squad-qa-freetext', 'squad-qg']:
         eval_src_data = split2data["dev-src"]
-        gens = generate(model=model, data=eval_src_data, device=device, batch_size=eval_batch_size)
+        stop_idxs = tokenizer.convert_tokens_to_ids([special_tokens['eos_tok'], special_tokens['no_ans_tok']])
+        gens = generate(model=model, data=eval_src_data, device=device, max_len=16,
+                        pad_idx=special_tokens_ids['pad_tok'], stop_idxs=stop_idxs)
         import ipdb; ipdb.set_trace()
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

@@ -53,13 +53,14 @@ function train_nlg() {
     model="gpt2-medium"
 	data_dir="/private/home/wangalexc/data/squad/v2.0/original"
 	out_dir="/checkpoint/wangalexc/ppb/${model}/squadv2_0_freetext/${date}"
+	tmp_dir="/checkpoint/wangalexc/ppb/${model}/squadv2_0_freetext/07-25-2019"
     mkdir -p ${out_dir}
 
     task="squad-qa-freetext"
-    batch_size=1
+    batch_size=4
     grad_accum=1
     learning_rate=.001
-    n_epochs=10
+    n_epochs=1
     patience=1
     opt_level="O3"
     use_distributed=0
@@ -71,7 +72,6 @@ function train_nlg() {
             --task_name ${task} \
             --data_dir ${data_dir} \
             --out_dir ${out_dir} \
-            --overwrite_output_dir \
             --no_input_lm_eval \
             --train_batch_size ${batch_size} \
             --gradient_accumulation_steps ${grad_accum} \
@@ -82,14 +82,12 @@ function train_nlg() {
             --world_size ${world_size}
             #--reload_data
             #--no_input_lm_train \
-
     else
         python -m ipdb finetune_pt_lm.py \
             --model_name ${model} \
             --task_name ${task} \
             --data_dir ${data_dir} \
             --out_dir ${out_dir} \
-            --overwrite_output_dir \
             --no_input_lm_eval \
             --train_batch_size ${batch_size} \
             --gradient_accumulation_steps ${grad_accum} \
@@ -97,9 +95,10 @@ function train_nlg() {
             --num_train_epochs ${n_epochs} \
             --patience ${patience} \
             --fp16 --fp16_opt_level ${opt_level} \
-            --skip_training
+            --use_only_gpuid 0 \
+            --skip_training #\
+            #--load_model_from ${tmp_dir} #\
             #--no_input_lm_train \
-            #--use_one_gpu
             #--reload_data
     fi
 
@@ -133,38 +132,52 @@ function predict_extractive() {
 
     date="06-25-2019"
     squad_version="v2_0"
+    n_qsts=10
 
-    pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
-	mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
-	out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
-	out_file="${out_dir}/prd.qst-${qst_src}.cnndm-${txt_fld}.json"
-    mkdir -p ${out_dir}
+    for gen_mdl in bus-subset fan-subset pgc-subset; do
+        for txt_fld in gen src; do
+            #for qst_src in gen src; do
 
-    # NOTE(Alex): maybe need --version_2_with_negative \
-	python finetune_pt_squad.py \
-	  --bert_model ${bert_version} \
-	  --do_predict \
-	  --do_lower_case \
-	  --predict_file ${pred_file} \
-	  --max_seq_length 384 \
-	  --doc_stride 128 \
-	  --output_dir ${out_dir} \
-      --prediction_file ${out_file} \
-      --overwrite_output_dir \
-      --load_model_from_dir ${mdl_dir} \
-      --version_2_with_negative
+            #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
+            pred_file="/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}/qst${n_qsts}-${qst_src}-sampling.cnndm-${txt_fld}.json"
+            mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
+            out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
+            out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-sampling.cnndm-${txt_fld}.json"
+            mkdir -p ${out_dir}
+
+            # NOTE(Alex): maybe need --version_2_with_negative \
+            python finetune_pt_squad.py \
+              --bert_model ${bert_version} \
+              --do_predict \
+              --do_lower_case \
+              --predict_file ${pred_file} \
+              --max_seq_length 384 \
+              --doc_stride 128 \
+              --output_dir ${out_dir} \
+              --prediction_file ${out_file} \
+              --overwrite_output_dir \
+              --load_model_from_dir ${mdl_dir} \
+              --version_2_with_negative;
+
+            #done;
+        done;
+    done
 
 }
 
 function evaluate_answers() {
     squad_version="2_0"
+    n_qst=10
 
-    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst-${qst_src}.cnndm-src.json
-    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst-${qst_src}.cnndm-${txt_fld}.json
+    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}.cnndm-src.json
+    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}.cnndm-${txt_fld}.json
+    out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/
+    #corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}.scores.txt
+    corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/qags-subset-human-eval-means.csv
 
     echo "Gold file: ${src_file}"
     echo "Pred file: ${trg_file}"
-    python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file};
+    python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file} --outdir ${out_dir} --correctness-file ${corr_file} --n-qsts-per-doc ${n_qst}
     #python -m ipdb evaluate-squad-v2-0.py --data-file ${src_file} --pred-file ${trg_file} --verbose
 
 }

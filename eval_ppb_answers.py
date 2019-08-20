@@ -1,4 +1,5 @@
 """ Evaluate answer spans """
+import os
 import re
 import sys
 import json
@@ -9,6 +10,7 @@ import editdistance
 from collections import Counter
 
 import numpy as np
+from scipy.stats import pearsonr, spearmanr
 
 def normalize_answer(s):
     """Lower text and remove punctuation, articles and extra whitespace."""
@@ -81,7 +83,7 @@ def aggregate_examples(scores, n_qst_per_doc=5):
     return agg_scores
 
 
-def evaluate(tgts, prds, metric_name="em"):
+def evaluate(tgts, prds, n_qsts_per_doc, metric_name="em"):
     """
 
     args:
@@ -117,7 +119,7 @@ def evaluate(tgts, prds, metric_name="em"):
         elif metric_name == "em":
             raise ValueError("Weird EM value found")
 
-    scores = aggregate_examples(scores)
+    scores = aggregate_examples(scores, n_qsts_per_doc)
 
     scores = np.array(scores)
     mean = scores.mean()
@@ -126,7 +128,7 @@ def evaluate(tgts, prds, metric_name="em"):
         mean *= 100.
         std *= 100.
 
-    return mean, std, good_exs, bad_exs
+    return scores.tolist(), mean, std, good_exs, bad_exs
 
 def load_data(data_file):
     """ """
@@ -140,20 +142,55 @@ def align_ans(srcs, trgs):
     trg_ans = list(trgs.values())
     return src_ans, trg_ans
 
+
+def count_noans(src_anss, trg_anss):
+    """ """
+    src_unans, trg_unans, both_unans = 0, 0, 0
+    for src_ans, trg_ans in zip(src_anss, trg_anss):
+        if src_ans == "" and trg_ans == "":
+            both_unans += 1
+        if src_ans == "":
+            src_unans += 1
+        if trg_ans == "":
+            trg_unans += 1
+    print(f"Source no answer: {src_unans} / {len(src_anss)}")
+    print(f"Target no answer: {trg_unans} / {len(trg_anss)}")
+    print(f"Both no answer: {both_unans}")
+
+
+def load_correctness(data_file):
+    """ Load file with correctness labels per summary
+    Currently very ad hoc """
+
+    return list(map(lambda x: float(x.strip()), open(data_file).readlines()))
+
+
 def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answer outputs from pytorch_pretrained_bert models')
-    parser.add_argument('--source-ans-file', type=str, default=None)
-    parser.add_argument('--target-ans-file', type=str, default=None)
+    parser.add_argument('--source-ans-file', type=str)
+    parser.add_argument('--target-ans-file', type=str)
+    parser.add_argument('--n-qsts-per-doc', type=int, default=5)
+    parser.add_argument('--outdir', type=str, default=None)
+    parser.add_argument('--correctness-file', type=str, default=None)
     args = parser.parse_args()
 
     srcs = load_data(args.source_ans_file)
-    if args.target_ans_file is not None:
-        trgs = load_data(args.target_ans_file)
-        src_ans, trg_ans = align_ans(srcs, trgs)
-        for metric in ['em', 'f1', 'ed']:
-            tgt_mean, tgt_std, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans, metric_name=metric)
-            print(f"Tgt {metric}: mean {tgt_mean}, std {tgt_std}")
+    trgs = load_data(args.target_ans_file)
+    src_ans, trg_ans = align_ans(srcs, trgs)
+    count_noans(src_ans, trg_ans)
+    for metric in ['em', 'f1', 'ed']:
+        scores, tgt_mean, tgt_std, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans,
+                                                                metric_name=metric,
+                                                                n_qsts_per_doc=args.n_qsts_per_doc)
+        print(f"Tgt {metric}: mean {tgt_mean}, std {tgt_std}")
+        if args.outdir is not None:
+            json.dump(scores, open(os.path.join(args.outdir, f"{metric}_scores.json"), "w"))
 
+    if args.correctness_file is not None:
+        correctness = load_correctness(args.correctness_file)
+        corr, pval = pearsonr(scores[:50], correctness)
+        print(f"Pearson corr wrt {args.correctness_file}: {corr} (p-val {pval})")
+        #print(f"# incorrect: {sum(1 - c for c in correctness) / len(correctness)}")
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
