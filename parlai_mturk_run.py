@@ -9,12 +9,14 @@ from parlai.core.params import ParlaiParser
 #    QualificationFlowSoloWorld,
 #)
 from parlai_mturk_worlds import (
-    QualificationFlowOnboardWorld, QualificationFlowSoloWorld
+    OnboardWorld, SoloWorld, ExampleGenerator,
 )
 from parlai.mturk.core.mturk_manager import MTurkManager
 import parlai.mturk.core.mturk_utils as mturk_utils
 from parlai.mturk.tasks.qualification_flow_example.task_config import task_config
+
 import os
+import json
 import random
 
 
@@ -23,13 +25,64 @@ def main():
     argparser = ParlaiParser(False, False)
     argparser.add_parlai_data_path()
     argparser.add_mturk_args()
+    argparser.add_argument(
+        '-mx_rsp_time',
+        '--max_resp_time',
+        default=1800,
+        type=int,
+        help='time limit for entering a dialog message',
+    )
+    argparser.add_argument(
+        '-mx_onb_time',
+        '--max_onboard_time',
+        type=int,
+        default=300,
+        help='time limit for turker' 'in onboarding',
+    )
+    argparser.add_argument(
+        '-nq',
+        '--n_qsts',
+        type=int,
+        default=5,
+        help='number of images to show \
+                           to turker',
+    )
+    argparser.add_argument(
+        '--data-path', type=str, default='/private/home/wangalexc/projects/qags/data/mturk', help='where to save data'
+    )
+    argparser.add_argument(
+        '--eval-data-path',
+        type=str,
+        default='/private/home/wangalexc/projects/qags/data/mturk/pair-judgments/mturk-bus-vs-fan-nex50.json',
+        help='where to load data to rank from. Leave '
+        'blank to use Personality-Captions data',
+    )
+    argparser.add_argument(
+        '-ck1',
+        '--compare-key-1',
+        type=str,
+        default='bus',
+        help='key of first option to compare',
+    )
+    argparser.add_argument(
+        '-ck2',
+        '--compare-key-2',
+        type=str,
+        default='fan',
+        help='key of second option to compare',
+    )
+
     opt = argparser.parse_args()
-    opt['task'] = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
+    directory_path = os.path.dirname(os.path.abspath(__file__))
+    opt['task'] = os.path.basename(directory_path)
     opt.update(task_config)
 
     mturk_agent_id = 'Worker'
     mturk_manager = MTurkManager(opt=opt, mturk_agent_ids=[mturk_agent_id])
-    mturk_manager.setup_server()
+    example_generator = ExampleGenerator(opt)
+    #mturk_manager.setup_server()
+    mturk_manager.setup_server(task_directory_path=directory_path)
+
     qual_name = 'ParlAIExcludeQual{}t{}'.format(
         random.randint(10000, 99999), random.randint(10000, 99999)
     )
@@ -43,7 +96,8 @@ def main():
     print('Created qualification: ', qualification_id)
 
     def run_onboard(worker):
-        world = QualificationFlowOnboardWorld(opt, worker)
+        worker.example_generator = example_generator
+        world = OnboardWorld(opt, worker)
         while not world.episode_done():
             world.parley()
         world.shutdown()
@@ -76,7 +130,7 @@ def main():
 
         def run_conversation(mturk_manager, opt, workers):
             mturk_agent = workers[0]
-            world = QualificationFlowSoloWorld(
+            world = SoloWorld(
                 opt=opt,
                 mturk_agent=mturk_agent,
                 qualification_id=qualification_id,
@@ -84,6 +138,7 @@ def main():
             )
             while not world.episode_done():
                 world.parley()
+            world.save_data()
             completed_workers.append(mturk_agent.worker_id)
             world.shutdown()
             world.review_work()

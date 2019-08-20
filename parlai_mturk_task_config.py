@@ -11,20 +11,20 @@ task_config = {}
 On the Amazon Mechanical Turk web site, the HIT title appears in search results,
 and everywhere the HIT is mentioned.
 """
-task_config['hit_title'] = 'Answer simple math questions'
+task_config['hit_title'] = 'Choose between two news summaries'
 
 
 """A description includes detailed information about the kind of task the HIT contains.
 On the Amazon Mechanical Turk web site, the HIT description appears in the expanded
 view of search results, and in the HIT and assignment screens.
 """
-task_config['hit_description'] = 'Gives a few math questions to be answered.'
+task_config['hit_description'] = 'Read a news article and two summaries, and decide which summary is better.'
 
 
 """One or more words or phrases that describe the HIT, separated by commas.
 On MTurk website, these words are used in searches to find HITs.
 """
-task_config['hit_keywords'] = 'chat,math'
+task_config['hit_keywords'] = 'news,summary'
 
 
 """A detailed task description that will be shown on the HIT task preview page
