@@ -134,15 +134,17 @@ function predict_extractive() {
     squad_version="v2_0"
     n_qsts=10
 
-    for gen_mdl in bus-subset fan-subset pgc-subset; do
+    #for gen_mdl in bus-subset fan-subset pgc-subset; do
+    for qg_ckpt in 1 3 5 7 10 15 20 25; do
         for txt_fld in gen src; do
             #for qst_src in gen src; do
+            gen_mdl="bus-subset"
 
             #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
-            pred_file="/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}/qst${n_qsts}-${qst_src}-sampling.cnndm-${txt_fld}.json"
+            pred_file="/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
             mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
             out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
-            out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-sampling.cnndm-${txt_fld}.json"
+            out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
             mkdir -p ${out_dir}
 
             # NOTE(Alex): maybe need --version_2_with_negative \
@@ -169,8 +171,8 @@ function evaluate_answers() {
     squad_version="2_0"
     n_qst=10
 
-    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}.cnndm-src.json
-    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}.cnndm-${txt_fld}.json
+    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}-diverse.cnndm-src.json
+    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}-diverse.cnndm-${txt_fld}.json
     out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/
     #corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}.scores.txt
     corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/qags-subset-human-eval-means.csv

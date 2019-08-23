@@ -45,15 +45,17 @@ def aggregate_questions():
     Each fseq log should have the txt field as 'source' (S)
     and the questions as generated 'hypotheses' (H) """
 
-    for model in ["pgc-subset", "fan-subset", "bus-subset"]:
+    #for model in ["pgc-subset", "fan-subset", "bus-subset"]:
+    for ckpt in [1, 3, 5, 7, 10, 15, 20, 25]:
         for n_qsts in [10]:
+            model = "bus-subset"
 
             #src_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.src-onmt-order.cnndm.test.out"
             #trg_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg-onmt-order.cnndm.test.out"
             #gen_qst_file = f"/checkpoint/wangalexc/fairseq/07-18-2019/qst.{model}.cnndm.test.out"
 
-            src_qst_file = f"/checkpoint/wangalexc/fairseq/08-14-2019/qst10.src-subset.cnndm.test.diverse.txt"
-            gen_qst_file = f"/checkpoint/wangalexc/fairseq/08-14-2019/qst10.{model}.cnndm.test.diverse.txt"
+            src_qst_file = f"/checkpoint/wangalexc/fairseq/08-23-2019/qst5-ckpt{ckpt}.src-subset.cnndm.test.txt"
+            gen_qst_file = f"/checkpoint/wangalexc/fairseq/08-21-2019/qst5-ckpt{ckpt}.{model}.cnndm.test.txt"
 
             qst_files = {
                          "src": src_qst_file,
@@ -85,7 +87,7 @@ def aggregate_questions():
 
                 data = format_squad(raw_data, context=txt_fld)
                 out_dir = f"/private/home/wangalexc/projects/qags/data/labeled-subset/{model}"
-                out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-diverse.cnndm-{txt_fld}.json"
+                out_file = f"{out_dir}/qst{n_qsts}-ckpt{ckpt}-{qst_src}.cnndm-{txt_fld}.json"
                 if not os.path.exists(out_dir):
                     os.mkdir(out_dir)
                 json.dump(data, open(out_file, "w", encoding="utf-8"))
