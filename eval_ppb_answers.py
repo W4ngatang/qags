@@ -8,6 +8,7 @@ import random
 import argparse
 import editdistance
 from collections import Counter
+import ipdb
 
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
@@ -68,16 +69,16 @@ def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     return max(scores_for_ground_truths)
 
 
-def aggregate_examples(scores, n_qst_per_doc=5):
+def aggregate_examples(scores, n_qsts_per_doc=5):
     """Jank way to aggregate questions across examples.
     Right now (7/18/19), questions by examples are grouped together.
     """
-    assert len(scores) % n_qst_per_doc == 0, "Number of questions invalid"
-    n_doc = int(len(scores) / n_qst_per_doc)
+    assert len(scores) % n_qsts_per_doc == 0, "Number of questions invalid"
+    n_doc = int(len(scores) / n_qsts_per_doc)
 
     agg_scores = []
     for i in range(n_doc):
-        agg_score = sum(scores[i * n_qst_per_doc : (i + 1) * n_qst_per_doc]) / n_qst_per_doc
+        agg_score = sum(scores[i * n_qsts_per_doc : (i + 1) * n_qsts_per_doc]) / n_qsts_per_doc
         agg_scores.append(agg_score)
 
     return agg_scores

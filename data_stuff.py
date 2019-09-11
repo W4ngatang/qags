@@ -7,6 +7,10 @@ import copy
 import random
 import itertools
 from collections import defaultdict
+import ipdb
+
+from nltk.tokenize import sent_tokenize
+
 from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
                   filter_line_fseq, parse_generation, \
@@ -182,8 +186,74 @@ def process_human_subset():
                 out_fh.write("\n".join(map(str, binary_scores)))
 
 
+REPLACE_PUNCT = {'-lrb-': '[', '-rrb-': ']'}
+NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m']
+NO_TRAILING_SPACE_PUNCT = [' `', ' \'']
+
+def detokenize_sent(sent):
+    """ Detokenize sents for readability, including:
+
+    - capitalizing first word of sentence (missing for proper nouns for English)
+    - remove extra spaces
+    - swap -lrb- and -rrb- for [, ] respectively
+    """
+    sent = sent.capitalize()
+    for k, v in REPLACE_PUNCT.items():
+        sent = sent.replace(k, v)
+    for punct in NO_LEADING_SPACE_PUNCT:
+        sent = sent.replace(f' {punct}', punct)
+    for punct in NO_TRAILING_SPACE_PUNCT:
+        sent = sent.replace(f'{punct} ', punct)
+    return sent
+
+def prepare_parlai_data():
+    """ Prepare data for ParlAI mturk tasks """
+
+    # load original articles
+    mdl_files = {
+                 'src': 'data/subset-src.txt',
+                 'bus': 'data/subset-bus.txt'
+                }
+    srcs = [s.strip() for s in open(mdl_files['src'])]
+
+    # for each model
+    for mdl_name, mdl_file in mdl_files.items():
+        # load the generations
+        gens = [g.strip() for g in open(mdl_file)]
+        sent_data = []
+        para_file = f"data/mturk/summary/{mdl_name}_para.jsonl"
+
+        with open(para_file, 'w', encoding='utf-8') as para_fh:
+            for src_idx, (src, gen) in enumerate(zip(srcs, gens)):
+
+                # TODO(Alex): split the generations by sentence
+                gen_sents = [detokenize_sent(s) for s in sent_tokenize(gen)]
+                for sent_idx, sent in enumerate(gen_sents):
+                    gen_d = {'dialog': [{'speaker': 'model', 'text': sent}],
+                             'ex_idx': (mdl_name, src_idx, sent_idx),
+                             'para_idx': sent_idx
+                            }
+                    sent_data.append(gen_d)
+
+                para_d = {
+                          'dialog': [{'speaker': 'model', 'text': ' '.join(gen_sents)}],
+                          'ex_idx': (mdl_name, src_idx, -1),
+                          'para_idx': 0
+                         }
+                para_fh.write(f"{json.dumps(para_d)}\n")
+
+                # write to jsonl
+                sent_file = f"data/mturk/summary/{mdl_name}_sents.jsonl"
+                with open(sent_file, 'w', encoding='utf-8') as sent_fh:
+                    for gen_d in sent_data:
+                        sent_fh.write(f"{json.dumps(gen_d)}\n")
+
+
+    # do the same but splitting the source
+
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
-aggregate_questions()
+#aggregate_questions()
 #format_abstractive_qa()
 #process_human_subset()
+prepare_parlai_data()

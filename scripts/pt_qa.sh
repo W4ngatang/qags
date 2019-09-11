@@ -170,16 +170,17 @@ function predict_extractive() {
 function evaluate_answers() {
     squad_version="2_0"
     n_qst=10
+    qg_ckpt=25
 
-    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}-diverse.cnndm-src.json
-    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-${qst_src}-diverse.cnndm-${txt_fld}.json
+    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-src.json
+    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json
     out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/
     #corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}.scores.txt
     corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/qags-subset-human-eval-means.csv
 
     echo "Gold file: ${src_file}"
     echo "Pred file: ${trg_file}"
-    python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file} --outdir ${out_dir} --correctness-file ${corr_file} --n-qsts-per-doc ${n_qst}
+    python eval_ppb_answers.py --source-ans-file ${src_file} --target-ans-file ${trg_file} --outdir ${out_dir} --correctness-file ${corr_file} --n-qsts-per-doc 5 #${n_qst}
     #python -m ipdb evaluate-squad-v2-0.py --data-file ${src_file} --pred-file ${trg_file} --verbose
 
 }
