@@ -20,7 +20,7 @@ On the Amazon Mechanical Turk web site, the HIT description appears in the expan
 view of search results, and in the HIT and assignment screens.
 """
 task_config['hit_description'] = \
-    'Read a sentence and a passage, then decide if the sentence is correct given the passage'
+    'Read a sentence and an article, then decide if the sentence is correct given the article.'
 
 
 """One or more words or phrases that describe the HIT, separated by commas.
@@ -28,4 +28,4 @@ On MTurk website, these words are used in searches to find HITs.
 """
 task_config['hit_keywords'] = 'news,summary,evaluation,comparison'
 
-task_config['task_description'] = 'Decide if a sentence is correct given a passage.'
+task_config['task_description'] = 'Decide if a sentence is correct given a article.'

@@ -341,76 +341,7 @@ class EvalResponse extends React.Component {
                           {choice2}
                         </Radio>
                       </Col>
-                      {/* <Slider
-                        name="speakerChoice"
-                        // dots
-                        min={-1000}
-                        max={1000}
-                        defaultValue={0}
-                        step={1}
-                        // style={{fontColor: 'black'}}
-                        marks={{
-                          // '-100': <div>I would <b>strongly</b> prefer to talk to <div style={speaker1_style}>Speaker 1</div></div>,
-                          '-1000': '',
-                          // '-90': '',
-                          '-800': '',
-                          // '-70': '',
-                          '-600': '',
-                          // '-50': '',
-                          '-400': '',
-                          // '-30': '',
-                          '-200': '',
-                          // '-10': '',
-                          '0': '',
-                          // '0': <div>I don't have a preference</div>,
-                          // '10': '',
-                          '200': '',
-                          // '30': '',
-                          '400': '',
-                          // '50': '',
-                          '600': '',
-                          // '70': '',
-                          '800': '',
-                          // '90': '',
-                          '1000': '',
-                          // '100': <div>I would <b>strongly</b> prefer to talk to <div style={speaker2_style}>Speaker 2</div></div>,
-                        }}
-                        trackStyle={{ backgroundColor: 'white'}}
-                        handleStyle={{
-                          backgroundColor: 'blue',
-                          height: 20,
-                          width: 20,
-                          marginLeft: -10,
-                          marginTop: -8,
-                        }}
-                        dotStyle={{
-                          height: 10, width: .5, bottom: -4, borderColor: 'darkgray'}}
-                        activeDotStyle={{
-                          height: 10, width: .5, bottom: -4, borderColor: 'darkgray'}}
-                        railStyle={{ backgroundColor: 'white' }}
-                        style={{'width': '67%', 'display': 'inline-block' }}
-                        value={this.state.speakerChoice}
-                        onChange={this.onSliderChange}
-                      />
-                      <div style={{fontSize:12}}>
-                        <Col sm={1}>
-                        </Col>
-                        <Col sm={2}>
-                          I would <b>strongly</b> prefer to talk to <div style={speaker1_style}>Speaker 1</div>
-                        </Col>
-                        <Col sm={2}>
-                        </Col>
-                        <Col sm={2}>
-                          I don't have a preference
-                        </Col>
-                        <Col sm={2}>
-                        </Col>
-                        <Col sm={2}>
-                          I would <b>strongly</b> prefer to talk to <div style={speaker2_style}>Speaker 2</div>
-                        </Col>
-                        <Col sm={1}>
-                        </Col>
-                      </div> */}
+                      {}
                 </FormGroup>
                 {text_reason}
               </div>
@@ -496,44 +427,82 @@ class PairwiseEvalPane extends React.Component {
 
 class TaskDescription extends React.Component {
   render () {
-    let header_text = "Is the sentence supported by the passage?";
+    let header_text;
+    if (this.props.task_data.mode == 'precision') {
+        header_text = "Is the sentence supported by the passage?";
+    } else {
+        header_text = "Is the main idea of the sentence in the passage?";
+    }
+
     if (this.props.task_description === null) {
       return (<div>Loading</div>);
     }
     let num_subtasks = this.props.task_description.num_subtasks;
 
     let question = this.props.task_description.question;
-    let content = (
-      <div>
+    let content;
+    if (this.props.task_data.mode == 'precision') {
+        content = (
+          <div>
 
-        In this task, you will read an&nbsp;
-        <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
-        <div style={speaker2_style}>sentences</div> on the right.
-        You may need to scroll down to see the full article.
-        <br/><br/>
-      
-        The task is to determine if the sentences are factually correct given the contents of the article.
-        Note that many sentences may contain portions of text copied directly from the article.
-        Be careful as some sentences may be combinations of two different parts
-        of the article, resulting in sentences that overall aren't supported by the article.
-        If the sentence doesn't make sense, you should mark it as not supported.&nbsp;
-        <br/><br/>
+            In this task, you will read an&nbsp;
+            <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
+            <div style={speaker2_style}>sentences</div> on the right.
+            You may need to scroll down to see the full article.
+            <br/><br/>
+          
+            The task is to determine if the sentences are factually correct given the contents of the article.
+            Note that many sentences may contain portions of text copied directly from the article.
+            Be careful as some sentences may be combinations of two different parts
+            of the article, resulting in sentences that overall aren't supported by the article.
+            If the sentence doesn't make sense, you should mark it as not supported.&nbsp;
+            <br/><br/>
 
-        You should also provide a text justification of your decision.
-        Failure to do so could result in your HITs being rejected.
-        <br/><br/>
+            You should also provide a text justification of your decision.
+            Failure to do so could result in your HITs being rejected.
+            <br/><br/>
 
-        <b> You will do this for {num_subtasks} pairs of articles and sentences.&nbsp;
-        Use the [NEXT] button when you're done with each judgment.</b>
-        <br/><br/>
+            <b> You will do this for {num_subtasks} pairs of articles and sentences.&nbsp;
+            Use the [NEXT] button when you're done with each judgment.</b>
+            <br/><br/>
 
-        NOTE: please be sure to only accept one of this task at a time.&nbsp;
-        Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
+            NOTE: please be sure to only accept one of this task at a time.&nbsp;
+            Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
 
-        <h4>Please accept the task when you're ready.</h4>
+            Please accept the task when you're ready.
 
-      </div>
-    );
+          </div>
+        );
+    } else {
+        content = (
+          <div>
+
+            In this task, you will read an&nbsp;
+            <div style={speaker1_style}>passage</div> on the left and a series of&nbsp;
+            <div style={speaker2_style}>sentences</div> on the right.
+            <br/><br/>
+          
+            The task is to determine if the main points of the sentences are present in the passage.
+            If a sentence in the passage is a fragment or doesn't make sense, you should ignore that passage sentence.
+            <br/><br/>
+
+            You should also provide a text justification of your decision.
+            Failure to do so could result in your HITs being rejected.
+            <br/><br/>
+
+            <b> You will do this for {num_subtasks} pairs of passage and sentences.&nbsp;
+            Use the [NEXT] button when you're done with each judgment.</b>
+            <br/><br/>
+
+            NOTE: please be sure to only accept one of this task at a time.&nbsp;
+            Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
+
+            Please accept the task when you're ready.
+
+          </div>
+        );
+    }
+
     if (!this.props.is_cover_page) {
       if (this.props.task_data.task_specs === undefined) {
         return (<div>Loading</div>);
@@ -541,31 +510,56 @@ class TaskDescription extends React.Component {
       let num_subtasks = this.props.num_subtasks;
       let cur_index = this.props.current_subtask_index + 1;
       let question = this.props.task_data.task_specs.question;
-      content = (
-        <div>
-          
-          <b>You are currently at comparison {cur_index} / {num_subtasks} </b>
-          <br/><br/>
+      if (this.props.task_data.mode == 'precision') {
+          content = (
+            <div>
+              
+              <b>You are currently at comparison {cur_index} / {num_subtasks} </b>
+              <br/><br/>
 
-          In this task, you will read an&nbsp;
-          <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
-          <div style={speaker2_style}>sentences</div> on the right.
-          You may need to scroll down to see the full article.
-          <br/><br/>
-          
-          The task is to determine if the sentences are correct given the article.
-          Note that many sentences may contain portions of text copied directly from the article.
-          Be careful as some sentences may be combinations of two different parts
-          of the article, resulting in sentences that overall aren't supported by the article.
-          If the sentence doesn't make sense, you should mark it as not supported.
-          <br/><br/>
+              In this task, you will read an&nbsp;
+              <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
+              <div style={speaker2_style}>sentences</div> on the right.
+              You may need to scroll down to see the full article.
+              <br/><br/>
+              
+              The task is to determine if the sentences are correct given the article.
+              Note that many sentences may contain portions of text copied directly from the article.
+              Be careful as some sentences may be combinations of two different parts
+              of the article, resulting in sentences that overall aren't supported by the article.
+              If the sentence is a fragment or doesn't make sense, you should mark it as not supported.
+              <br/><br/>
 
-          You should also provide a text justification of your decision.
-          Failure to do so could result in your HITs being rejected.
-          <br/><br/>
+              You should also provide a text justification of your decision.
+              Failure to do so could result in your HITs being rejected.
+              <br/><br/>
 
-        </div>
-      );
+            </div>
+          );
+      } else {
+          content = (
+            <div>
+              
+              <b>You are currently at comparison {cur_index} / {num_subtasks} </b>
+              <br/><br/>
+
+              In this task, you will read an&nbsp;
+              <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
+              <div style={speaker2_style}>sentences</div> on the right.
+              You may need to scroll down to see the full article.
+              <br/><br/>
+              
+              The task is to determine if the main points of the sentences are present in the article.
+              If the sentence is a fragment or doesn't make sense, you should mark it as not supported.
+              <br/><br/>
+
+              You should also provide a text justification of your decision.
+              Failure to do so could result in your HITs being rejected.
+              <br/><br/>
+
+            </div>
+          );
+      }
     }
     return (
       <div>

@@ -68,6 +68,10 @@ def make_flags(from_argv=False):
      help='text next to speaker 2 radio button'
     )
     argparser.add_argument(
+     '--mode', type=str, choices=['precision', 'recall'], default='precision',
+     help='HIT task type'
+    )
+    argparser.add_argument(
      '--question', type=str, default='Is the sentence supported by the article?',
      help='question to present to turker for comparison (e.g. "Which speaker is better?")'
     )
@@ -155,8 +159,8 @@ def setup_task_queue(opt):
                 try:
                     single_task_json = json.loads(l)
                 except:
-                    print(data_fn)
-                    print(l)
+                    print(f"Failed to load a line from {data_fn}")
+                    print(f"Bad line: {l}")
                 id = single_task_json.get('ex_idx')
                 #id = single_task_json.get('assignment_id_hashed')
                 if id is None:
@@ -179,7 +183,7 @@ def setup_task_queue(opt):
         for (id1, id2, matchup) in opt['onboarding_tasks']:
             task = make_task_from_ids(
                 id1, id2, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
-                opt['question'], opt['correctness_is_flipped'], matchup=matchup
+                opt['question'], opt['correctness_is_flipped'], matchup=matchup, mode=opt['mode']
             )
             conv1 = all_conv_data.get(id1)
             conv2 = all_conv_data.get(id2)
@@ -207,7 +211,7 @@ def setup_task_queue(opt):
             id2 = onboarding_human_convs[i]
             make_task_from_ids(
                 id1, id2, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
-                opt['question'], opt['correctness_is_flipped'], matchup='qual1'
+                opt['question'], opt['correctness_is_flipped'], matchup='qual1', mode=opt['mode']
             )
             internal_id += 1
 
@@ -219,7 +223,7 @@ def setup_task_queue(opt):
         for (id1, id2, hit_id, matchup) in opt['pair_data']:
             task = make_task_from_ids(
                 id1, id2, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
-                opt['question'], opt['correctness_is_flipped'], hit_id, matchup
+                opt['question'], opt['correctness_is_flipped'], hit_id, matchup, mode=opt['mode']
             )
             desired_tasks[internal_id] = task
             for id in [id1, id2]:
@@ -265,7 +269,7 @@ def setup_task_queue(opt):
 
                     task = make_task_from_ids(
                         par_id, sent_id, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
-                        opt['question'], opt['correctness_is_flipped'], matchup=matchup_name
+                        opt['question'], opt['correctness_is_flipped'], matchup=matchup_name, mode=opt['mode']
                     )
                     par_tasks.append(task)
                     for id in [par_id, sent_id]:
@@ -301,7 +305,7 @@ def setup_task_queue(opt):
 
                 task = make_task_from_ids(
                     id1, id2, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
-                    opt['question'], opt['correctness_is_flipped'], matchup=matchup_name
+                    opt['question'], opt['correctness_is_flipped'], matchup=matchup_name, mode=opt['mode']
                 )
                 desired_tasks[internal_id] = task
                 for id in [id1, id2]:
@@ -329,7 +333,7 @@ def setup_task_queue(opt):
 
 def make_task_from_ids(
     id1, id2, internal_id, all_conv_data, s1_choice, s2_choice, question,
-    is_flipped, hitid='', matchup='regular'
+    is_flipped, hitid='', matchup='regular', mode='precision',
 ):
     """ Create task_data dictionary and return it """
     conv_orders = [[0, 1], [1, 0]]
@@ -353,8 +357,10 @@ def make_task_from_ids(
     specs['question'] = question
     specs['correctness_is_flipped'] = is_flipped
     specs['speakers_to_eval'] = ['model', 'model']
-    if matchup[:4] == 'qual':
+    specs['mode'] = mode
+    if matchup.startswith('qual'):
         specs['is_onboarding'] = True
+        specs['answer'] = conv2["answer"] if "answer" in conv2 else None
 
     return task_data
 
@@ -368,7 +374,7 @@ def get_new_task_data(worker, tasks_per_hit):
     worker_id = worker.worker_id
     task_data = get_onboarding_tasks(worker_id, tasks_per_hit)
     if len(task_data) == tasks_per_hit:
-        return onboarding_tasks
+        return task_data
     tries = 0
     completed_tasks = workers_to_desired_tasks_completed.get(worker_id, [])
     seen_conversations = workers_to_conversations_seen.get(worker_id, [])
@@ -445,6 +451,11 @@ def return_task_data(worker_id, task_data):
                 print("WARNING: task completion tracking error, couldn't remove task index")
 
 
+def save_data(data):
+    """
+    """
+    pass
+
 def get_onboarding_tasks(worker_id, tasks_per_hit):
     """ Get the next onboarding task for this worker id. If the worker has never
     done a task, shuffle the onboarding tasks for them. If they've done all
@@ -476,10 +487,13 @@ def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_d
         if not task_specs.get('is_onboarding', False):
             continue
         worker_response = float(save_data['worker_data'][worker_id]['response']['task_data'][i]['speakerChoice'])
-        expected_response = (
-            1 if ((task_specs['conversation_order'] == [1, 0] and not task_specs['correctness_is_flipped']) or
-            (task_specs['conversation_order'] == [0, 1] and task_specs['correctness_is_flipped']))
-            else 2)
+        if task_specs['answer'] is not None:
+            expected_response = 1 if task_specs['answer'] == 'yes' else 2
+        else:
+            expected_response = (
+                1 if ((task_specs['conversation_order'] == [1, 0] and not task_specs['correctness_is_flipped']) or
+                (task_specs['conversation_order'] == [0, 1] and task_specs['correctness_is_flipped']))
+                else 2)
         num_onboarding_tasks += 1
         # if worker_response * expected_side > 0:
         if worker_response == expected_response:
@@ -568,18 +582,26 @@ def main(opt, task_config):
             )
             while not world.episode_done():
                 world.parley()
+            print("Finished running task, cleaning up.")
 
             world.shutdown()
+            print("Finished shutting down.")
 
-            save_data = world.prep_save_data(workers)
+            to_save_data = world.prep_save_data(workers)
+            print("Finished preparing save data.")
 
             if not world.did_complete():
+                print("Didn't finish HIT. Returning task data...")
                 return_task_data(workers[0].worker_id, task_data)
             elif opt['block_on_onboarding']:
+                print("Reviewing onboarding...")
                 check_and_update_worker_approval(
-                    mturk_manager, workers[0].worker_id, opt['onboarding_threshold'], save_data
+                    mturk_manager, workers[0].worker_id, opt['onboarding_threshold'], to_save_data
                 )
-            return save_data
+                print("\tDone reviewing")
+
+            save_data(to_save_data)
+            return to_save_data
 
         print("This run id: {}".format(mturk_manager.task_group_id))
 

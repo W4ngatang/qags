@@ -7,12 +7,13 @@ def set_args():
     #args['dialogs_path'] = '/private/home/wangalexc/projects/qags/data/mturk/pairwise_eval'
     #args['model_comparisons'] = [('dummy-sents', 'dummy-passages')]
     args['dialogs_path'] = '/private/home/wangalexc/projects/qags/data/mturk/summary'
-    args['model_comparisons'] = [('bus_para', 'src_sents')]
+    args['model_comparisons'] = [('bus_para', 'src_sent')]
     #args['pair_data'] = [('src_para', 'bus_sents')]
     args['pairs_per_matchup'] = 10
     args['annotations_per_pair'] = 1
 
     # Task definition
+    args['mode'] = 'recall'
     args['question'] = 'Is the main idea of the sentence captured by the article ?'
     args['s1_choice'] = ''
     args['s2_choice'] = ''
