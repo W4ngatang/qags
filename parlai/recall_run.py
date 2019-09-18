@@ -6,10 +6,10 @@ def set_args():
     args = make_flags()
     #args['dialogs_path'] = '/private/home/wangalexc/projects/qags/data/mturk/pairwise_eval'
     #args['model_comparisons'] = [('dummy-sents', 'dummy-passages')]
-    args['dialogs_path'] = '/private/home/wangalexc/projects/qags/data/mturk/summary'
+    args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/summary'
     args['model_comparisons'] = [('bus_para', 'src_sent')]
     #args['pair_data'] = [('src_para', 'bus_sents')]
-    args['pairs_per_matchup'] = 10
+    args['pairs_per_matchup'] = 2
     args['annotations_per_pair'] = 1
 
     # Task definition
@@ -31,7 +31,7 @@ def set_args():
     args['assignment_duration_in_seconds'] = 600
     args['reward'] = 0.5
     #args['comparisons_per_hit'] = 3
-    args['max_hits_per_worker'] = 5
+    args['max_hits_per_worker'] = 100
 
     # Additional args that can be set - here we show the default values.
     # For a full list, refer to run.py & the ParlAI/parlai/params.py

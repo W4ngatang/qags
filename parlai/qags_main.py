@@ -25,15 +25,16 @@ task_queue = Queue()
 
 onboarding_tasks = {}
 onboarding_conv_ids = []
+ONBOARD_FAIL_MSG = 'Failed quality control check'
+SHORT_RESPONSE_MSG = 'Provided reason is too short'
+onboarding_failed_workers = []
 
 desired_tasks = {}
 conversations_to_tasks = {}
 
 workers_to_desired_tasks_completed = {}
-workers_to_conversations_seen = {}
 workers_to_onboarding_tasks_todo = {}
 
-onboarding_failed_workers = []
 
 
 def make_flags(from_argv=False):
@@ -46,6 +47,14 @@ def make_flags(from_argv=False):
     argparser.add_argument(
      '--dialogs_path', type=str, default=None,
      help='path to folder with conversation log files for evaluation'
+    )
+    argparser.add_argument(
+     '--out_file', type=str, default=None,
+     help='path to file to write worker data'
+    )
+    argparser.add_argument(
+     '--bad_worker_file', type=str, default=None,
+     help='(optional) path to file with workers to exclude'
     )
     argparser.add_argument(
      '--annotations_per_pair', type=int, default=1,
@@ -233,11 +242,11 @@ def setup_task_queue(opt):
                 conversation_task_list.append(id)
             internal_id += 1
 
-    # make desired tasks randomly from scratch
     elif opt['model_comparisons']:
         n_pairs = opt['pairs_per_matchup']
         for model_0, model_1 in opt['model_comparisons']:
-            assert (model_0 in conv_ids_by_model and model_1 in conv_ids_by_model), print(f"Found {conv_ids_by_model.keys()}\nPlease provide a list of tuples of valid models in --model_comparison")
+            assert (model_0 in conv_ids_by_model and model_1 in conv_ids_by_model), \
+                    print(f"Found {conv_ids_by_model.keys()}\nPlease provide a list of tuples of valid models in --model_comparison")
 
             matchup_name = '{},{}'.format(model_0, model_1)
             conv_pairs = []
@@ -280,8 +289,8 @@ def setup_task_queue(opt):
                     internal_id += 1
 
                 desired_tasks[par_id] = par_tasks
-                #desired_tasks[internal_id] = task
 
+    # make desired tasks randomly from scratch
     elif opt['random_pairing']:
         for model_0, model_1 in opt['model_comparisons']:
             if (model_0 not in conv_ids_by_model or model_1 not in conv_ids_by_model):
@@ -367,7 +376,7 @@ def make_task_from_ids(
 
 def get_new_task_data(worker, tasks_per_hit):
     """ Get next task for worker. Returns the next onboarding task if worker
-    hasn't finished them all, or finds a task from the queue they haven't seen
+    hasn't finished them all, or finds a task from the queue they haven't done
     If they've seen everything in the queue, spin up an extra task (one that
     was in the queue and is now saturated)
     """
@@ -377,7 +386,6 @@ def get_new_task_data(worker, tasks_per_hit):
         return task_data
     tries = 0
     completed_tasks = workers_to_desired_tasks_completed.get(worker_id, [])
-    seen_conversations = workers_to_conversations_seen.get(worker_id, [])
     while (not task_queue.empty()) and tries < task_queue.qsize():
         try:
             next_tasks = task_queue.get()
@@ -386,21 +394,12 @@ def get_new_task_data(worker, tasks_per_hit):
         tries += 1
 
         task_ids = [t['task_specs']['internal_id'] for t in next_tasks]
-        if (not any([i in completed_tasks for i in task_ids])): #and
-            #    next_task['conversations'][0] not in seen_conversations and
-            #    next_task['conversations'][1] not in seen_conversations):
+        if (not any([i in completed_tasks for i in task_ids])):
             # if the task has not been
             #   1) completed by the worker
-            #   2) seen by the worker (either conversation)
-            #
             # update their info so that they've completed this task
-            # and mark that they've seen these conversations
-            #completed_tasks.append(next_task['task_specs']['internal_id'])
-            #seen_conversations.extend(next_task['conversations'])
             completed_tasks.extend(task_ids)
             workers_to_desired_tasks_completed[worker_id] = completed_tasks
-            seen_conversations.extend([t['conversations'] for t in next_tasks])
-            workers_to_conversations_seen[worker_id] = seen_conversations
             #task_data.append(next_task)
             #if len(task_data) == tasks_per_hit:
             task_data.extend(next_tasks) # next_task is a list of tasks already
@@ -428,65 +427,93 @@ def get_new_task_data(worker, tasks_per_hit):
 
 
 def return_task_data(worker_id, task_data):
-    """ When worder doesn't complete a task, return it to the queue or
+    """ When worker doesn't complete a task, return it to the queue or
     change their onboarding status depending on the task"""
+    is_onboarding = False
+
+    # un-list the task as one the worker has completed
     for subtask_data in task_data:
         if subtask_data['task_specs'].get('is_onboarding', False):
             workers_to_onboarding_tasks_todo[worker_id].append(
-                subtask_data['task_specs']['internal_id']
-            )
+                subtask_data['task_specs']['internal_id'])
+            is_onboarding = True
         else:
-            task_queue.put(subtask_data)
-            try:
-                workers_to_desired_tasks_completed[worker_id].remove(
-                    subtask_data['task_specs']['internal_id']
-                )
-                workers_to_conversations_seen[worker_id].remove(
-                    subtask_data['conversations'][0]
-                )
-                workers_to_conversations_seen[worker_id].remove(
-                    subtask_data['conversations'][1]
-                )
-            except ValueError():
-                print("WARNING: task completion tracking error, couldn't remove task index")
+            workers_to_desired_tasks_completed[worker_id].remove(
+                subtask_data['task_specs']['internal_id'])
+
+    # put the HIT back on the task queue
+    if not is_onboarding:
+        task_queue.put(task_data)
 
 
-def save_data(data):
+def save_data(data, file_handle):
+    """ Write data to open output file handle
     """
-    """
-    pass
+    file_handle.write(f"{data}\n")
+    return
+
 
 def get_onboarding_tasks(worker_id, tasks_per_hit):
     """ Get the next onboarding task for this worker id. If the worker has never
     done a task, shuffle the onboarding tasks for them. If they've done all
     of the onboarding tasks or if there are no onboarding tasks, return None
     """
+
+    # no onboarding tasks
     if len(onboarding_tasks) == 0:
         return []
+
     onboarding_tasks_todo = workers_to_onboarding_tasks_todo.get(worker_id)
+
+    # new worker
     if onboarding_tasks_todo is None:
         onboarding_tasks_todo = list(onboarding_tasks.keys())
         np.random.shuffle(onboarding_tasks_todo)
         workers_to_onboarding_tasks_todo[worker_id] = onboarding_tasks_todo
+
+    # worker has completed all onboarding tasks
     if len(onboarding_tasks_todo) == 0:
         return []
-    num_tasks_to_return = min(len(onboarding_tasks_todo), tasks_per_hit)
-    onboarding_tasks_chosen = onboarding_tasks_todo[:num_tasks_to_return]
-    workers_to_onboarding_tasks_todo[worker_id] = onboarding_tasks_todo[num_tasks_to_return:]
-    return [onboarding_tasks[id] for id in onboarding_tasks_chosen]
+
+    assert len(onboarding_tasks_todo) == len(onboarding_tasks), \
+            "Invalid number of onboarding tasks found!"
+
+    # just return all onboarding tasks
+    #num_tasks_to_return = min(len(onboarding_tasks_todo), tasks_per_hit)
+    #onboarding_tasks_chosen = onboarding_tasks_todo[:num_tasks_to_return]
+    #workers_to_onboarding_tasks_todo[worker_id] = onboarding_tasks_todo[num_tasks_to_return:]
+    #return [onboarding_tasks[id] for id in onboarding_tasks_chosen]
+    return [onboarding_tasks[id] for id in onboarding_tasks_todo]
 
 
-def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_data):
+def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_data,
+        bad_worker_fh=None):
     """ Reject and soft block workers who fail onboarding tasks """
 
-    task_data = save_data['worker_data'][worker_id]['task_data']
+    worker_data = save_data['worker_data'][worker_id]
+    task_data = worker_data['task_data']
+    responses = worker_data['response']
     num_onboarding_tasks = 0
     num_correct = 0
-    for i in range(len(task_data)):
-        task_specs = task_data[i]['task_specs']
+
+    short_msg_flag = 0
+    short_time_flag = 0 # currently not used
+
+    # check the tasks
+    for i, task_datum in enumerate(task_data):
+        task_specs = task_datum['task_specs']
+        response = responses['task_data'][i]
+        text_response = response['textReason']
+        choice_response = float(response['speakerChoice'])
+
+        # one or more msg was too short
+        if (not text_response) or (len(text_response) < 3):
+            short_msg_flag = 1
+
         if not task_specs.get('is_onboarding', False):
             continue
-        worker_response = float(save_data['worker_data'][worker_id]['response']['task_data'][i]['speakerChoice'])
+
+        # extract answer
         if task_specs['answer'] is not None:
             expected_response = 1 if task_specs['answer'] == 'yes' else 2
         else:
@@ -494,33 +521,48 @@ def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_d
                 1 if ((task_specs['conversation_order'] == [1, 0] and not task_specs['correctness_is_flipped']) or
                 (task_specs['conversation_order'] == [0, 1] and task_specs['correctness_is_flipped']))
                 else 2)
+
+        # bookkeeping
         num_onboarding_tasks += 1
-        # if worker_response * expected_side > 0:
-        if worker_response == expected_response:
-            num_correct += 1
+        num_correct += int(choice_response == expected_response)
+
+    # review for non-onboarding tasks
     if num_onboarding_tasks == 0:
+
+        # auto-fail workers who didn't pass onboarding
         if worker_id in onboarding_failed_workers:
-            # mturk_manager.reject_work(
-            #     save_data['worker_data'][worker_id]['assignment_id'],
-            #     'Failed quality control'
-            # )
+            mturk_manager.reject_work(worker_data['assignment_id'], ONBOARD_FAIL_MSG)
             return_task_data(worker_id, task_data)
+
+        # fail workers who msgs were too short
+        if short_msg_flag:
+            mturk_manager.reject_work(worker_data['assignment_id'], SHORT_RESPONSE_MSG)
+            return_task_data(worker_id, task_data)
+
         return
-    if (num_correct / num_onboarding_tasks) >= threshold:
+
+    # onboarding tasks
+    if (num_correct / num_onboarding_tasks) >= threshold and not short_msg_flag:
+        # Passed quality control, continue
         return
-    # mturk_manager.reject_work(
-    #     save_data['worker_data'][worker_id]['assignment_id'],
-    #     'Failed quality control'
-    # )
-    mturk_manager.soft_block_worker(worker_id)
-    onboarding_failed_workers.append(worker_id)
-    print("SOFT BLOCKING")
+    else:
+        # Failed quality control
+        msg = SHORT_RESPONSE_MSG if short_msg_flag else ONBOARD_FAIL_MSG
+        mturk_manager.reject_work(worker_data['assignment_id'], msg)
+        mturk_manager.soft_block_worker(worker_id)
+        onboarding_failed_workers.append(worker_id)
+        if bad_worker_fh is not None:
+            bad_worker_fh.write(f"{worker_id}\n")
+        print(f"\tSoft blocking worker {worker_id}")
+
+    return
 
 
 def main(opt, task_config):
     """Handles setting up and running a ParlAI-MTurk task by instantiating
     an MTurk manager and configuring it for the qa_data_collection task
     """
+
     np.random.seed(opt['seed'])
 
     # Set the task name to be the folder name
@@ -549,6 +591,12 @@ def main(opt, task_config):
     if opt['block_on_onboarding'] and opt['block_qualification'] is None:
         raise Exception("You must set block_qualification or set block_on_onboarding to False")
 
+    out_fh = open(opt['out_file'], 'w')
+    if opt['bad_worker_file'] is not None:
+        with open(opt['bad_worker_file'], 'r') as bad_worker_fh:
+            workers_to_block = [worker.strip() for worker in bad_worker_fh]
+        bad_worker_fh = open(opt['bad_worker_file'], 'a')
+
     try:
         # Initialize run information
         mturk_manager.start_new_run()
@@ -559,9 +607,9 @@ def main(opt, task_config):
         # Create the hits as specified by command line arguments
         mturk_manager.create_hits()
 
-        # for worker_id in workers_to_block:
-        #     mturk_manager.soft_block_worker(worker_id)
-
+        if opt['bad_worker_file'] is not None:
+            for worker_id in workers_to_block:
+                mturk_manager.soft_block_worker(worker_id)
 
         def check_worker_eligibility(worker):
             return True
@@ -582,7 +630,7 @@ def main(opt, task_config):
             )
             while not world.episode_done():
                 world.parley()
-            print("Finished running task, cleaning up.")
+            print("Finished running task.")
 
             world.shutdown()
             print("Finished shutting down.")
@@ -596,11 +644,12 @@ def main(opt, task_config):
             elif opt['block_on_onboarding']:
                 print("Reviewing onboarding...")
                 check_and_update_worker_approval(
-                    mturk_manager, workers[0].worker_id, opt['onboarding_threshold'], to_save_data
+                    mturk_manager, workers[0].worker_id, opt['onboarding_threshold'],
+                    to_save_data, bad_worker_fh
                 )
-                print("\tDone reviewing")
+                print("\tDone reviewing onboarding")
 
-            save_data(to_save_data)
+            save_data(to_save_data, out_fh)
             return to_save_data
 
         print("This run id: {}".format(mturk_manager.task_group_id))
@@ -620,10 +669,16 @@ def main(opt, task_config):
         # Any hits that aren't claimed or completed have to be shut down. Must
         # keep the world running until that point.
         mturk_manager.expire_all_unassigned_hits()
+
+        # Close file handles
+        out_fh.close()
+        if opt['bad_worker_file'] is not None:
+            bad_worker_fh.close()
+
         # Shutdown the manager and free all related resources
         mturk_manager.shutdown()
-        print("ALL ONBOARDING FAILED WORKERS")
-        print(onboarding_failed_workers)
+
+        print(f"ALL ONBOARDING FAILED WORKERS: {onboarding_failed_workers}")
 
 
 if __name__ == '__main__':
