@@ -452,15 +452,15 @@ class TaskDescription extends React.Component {
         <br/><br/>
 
         You should also provide a text justification of your decision.
-        Failure to do so could result in your HITs being rejected.
+        <b>Failure to do so will result in your HITs being rejected.</b>
         <br/><br/>
 
-        <b> You will do this for {num_subtasks} pairs of articles and sentences.&nbsp;
-        Use the [NEXT] button when you're done with each judgment.</b>
-        <br/><br/>
-
+        You will do this for pairs of articles and sentences.&nbsp;
+        After you've made your selection, a [NEXT] button will appear on the left.
+        <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>
         NOTE: please be sure to only accept one of this task at a time.&nbsp;
         Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
+        <br/><br/>
 
         Please accept the task when you're ready.
 
@@ -494,11 +494,12 @@ class TaskDescription extends React.Component {
           <br/><br/>
 
           You should also provide a text justification of your decision.
-          Failure to do so could result in your HITs being rejected.
+          Failure to do so will result in your HITs being rejected.
           <br/><br/>
 
         </div>
       );
+    }
 
     return (
       <div>

@@ -443,20 +443,20 @@ class TaskDescription extends React.Component {
         <div style={speaker2_style}>sentences</div> on the right.
         <br/><br/>
       
-        The task is to determine if the main points of the sentences are present in the passage.
-        If a sentence in the passage is a fragment or doesn't make sense, you should ignore that passage sentence.
+        The task is to determine if the main points of the sentences are present in the passage.&nbsp;
+        If a sentence in the passage is a fragment or doesn't make sense, you should ignore that passage sentence.&nbsp;
         <br/><br/>
 
-        You should also provide a text justification of your decision.
-        Failure to do so could result in your HITs being rejected.
+        You should also provide a text justification of your decision.&nbsp;
+        <b>Failure to do so will result in your HITs being rejected.</b>
         <br/><br/>
 
-        <b> You will do this for {num_subtasks} pairs of passage and sentences.&nbsp;
-        Use the [NEXT] button when you're done with each judgment.</b>
-        <br/><br/>
-
+        You will do this for pairs of articles and sentences.&nbsp;
+        After you've made your selection, a [NEXT] button will appear on the left.&nbsp;
+        <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>&nbsp;
         NOTE: please be sure to only accept one of this task at a time.&nbsp;
         Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
+        <br/><br/>
 
         Please accept the task when you're ready.
 
@@ -482,17 +482,18 @@ class TaskDescription extends React.Component {
           You may need to scroll down to see the full article.
           <br/><br/>
           
-          The task is to determine if the main points of the sentences are present in the article.
-          If the sentence is a fragment or doesn't make sense, you should mark it as not supported.
+          The task is to determine if the main points of the sentences are present in the article.&nbsp;
+          If a sentence in the passage is a fragment or doesn't make sense, you should ignore that passage sentence.&nbsp;
           <br/><br/>
 
           You should also provide a text justification of your decision.
-          Failure to do so could result in your HITs being rejected.
+          Failure to do so will result in your HITs being rejected.
           <br/><br/>
 
         </div>
       );
     }
+
     return (
       <div>
           <h1>{header_text}</h1>

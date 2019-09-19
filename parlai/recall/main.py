@@ -20,6 +20,7 @@ import parlai.mturk.core.mturk_utils as mturk_utils
 
 
 display_agent_name = 'RatingWorker'
+MAX_TASKS_PER_HIT = 10
 
 task_queue = Queue()
 
@@ -162,6 +163,9 @@ def setup_task_queue(opt):
         if data_fn.endswith("swp"):
             continue
         full_data_fn = os.path.join(data_folder, data_fn)
+        if os.path.isdir(full_data_fn):
+            continue
+
         print(f"Loading data from {full_data_fn}")
         with open(full_data_fn, 'r', encoding='utf-8') as dialog_data_file:
             for l in dialog_data_file:
@@ -271,6 +275,8 @@ def setup_task_queue(opt):
                 sent_ids.sort(key=lambda x: x[2])
 
                 par_tasks = []
+                n_shards = (len(sent_ids) // 10) + 1
+                shard_idx = 0
                 for sent_id in sent_ids:
                     if (par_id, sent_id) in conv_pairs:
                         continue
@@ -281,6 +287,13 @@ def setup_task_queue(opt):
                         opt['question'], opt['correctness_is_flipped'], matchup=matchup_name, mode=opt['mode']
                     )
                     par_tasks.append(task)
+
+                    # max tasks we want in a single HIT
+                    if len(par_tasks) >= MAX_TASKS_PER_HIT:
+                        desired_tasks[f"{par_id}-s{shard_idx}"] = par_tasks
+                        par_tasks = []
+                        shard_idx += 1
+
                     for id in [par_id, sent_id]:
                         if id not in conversations_to_tasks:
                             conversations_to_tasks[id] = []
@@ -288,7 +301,7 @@ def setup_task_queue(opt):
                         conversation_task_list.append(id)
                     internal_id += 1
 
-                desired_tasks[par_id] = par_tasks
+                desired_tasks[f"{par_id}-s{shard_idx}"] = par_tasks
 
     # make desired tasks randomly from scratch
     elif opt['random_pairing']:
@@ -337,7 +350,6 @@ def setup_task_queue(opt):
     if opt['max_hits_per_worker'] == 0:
         opt['max_hits_per_worker'] = (
             (len(desired_tasks) + len(onboarding_tasks)) / opt['comparisons_per_hit'])
-    print(opt)
 
 
 def make_task_from_ids(
@@ -479,9 +491,9 @@ def get_onboarding_tasks(worker_id, tasks_per_hit):
             "Invalid number of onboarding tasks found!"
 
     # just return all onboarding tasks
+    workers_to_onboarding_tasks_todo[worker_id] = [] #onboarding_tasks_todo[num_tasks_to_return:]
     #num_tasks_to_return = min(len(onboarding_tasks_todo), tasks_per_hit)
     #onboarding_tasks_chosen = onboarding_tasks_todo[:num_tasks_to_return]
-    #workers_to_onboarding_tasks_todo[worker_id] = onboarding_tasks_todo[num_tasks_to_return:]
     #return [onboarding_tasks[id] for id in onboarding_tasks_chosen]
     return [onboarding_tasks[id] for id in onboarding_tasks_todo]
 
@@ -570,6 +582,9 @@ def main(opt, task_config):
 
     # append the contents of task_config.py to the configuration
     opt.update(task_config)
+
+    # for logging
+    print(opt)
 
     # set up the HITs, which I think doesn't require a server
     setup_task_queue(opt)

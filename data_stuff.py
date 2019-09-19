@@ -212,9 +212,12 @@ def prepare_parlai_data():
     # load original articles
     mdl_files = {
                  'src': 'data/subset-src.txt',
-                 'bus': 'data/subset-bus.txt'
+                 'bus': 'data/subset-bus.txt',
+                 'fas': 'data/subset-fan.txt',
+                 'pgc': 'data/subset-pgc.txt',
+                 'trg': 'data/subset-trg.txt'
                 }
-    srcs = [s.strip() for s in open(mdl_files['src'])]
+    srcs = [s.strip() for s in open(mdl_files['src'], encoding="utf-8")]
 
     # for each model
     for mdl_name, mdl_file in mdl_files.items():

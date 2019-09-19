@@ -6,7 +6,7 @@
 import os
 import json
 import time
-import ipdb
+#import ipdb
 
 from queue import Queue
 import numpy as np
@@ -162,6 +162,9 @@ def setup_task_queue(opt):
         if data_fn.endswith("swp"):
             continue
         full_data_fn = os.path.join(data_folder, data_fn)
+        if os.path.isdir(full_data_fn):
+            continue
+
         print(f"Loading data from {full_data_fn}")
         with open(full_data_fn, 'r', encoding='utf-8') as dialog_data_file:
             for l in dialog_data_file:
@@ -407,37 +410,24 @@ def get_new_task_data(worker, tasks_per_hit):
         else:
             task_queue.put(next_tasks)
 
-    # task queue is exhausted
-    #tasks_still_needed = tasks_per_hit - len(task_data)
-    #tasks_remaining = [id for id in desired_tasks.keys() if id not in completed_tasks]
-    #tasks_chosen = [
-    #    t for t in tasks_remaining
-    #    if desired_tasks[t]['conversations'][0] not in seen_conversations
-    #    and desired_tasks[t]['conversations'][1] not in seen_conversations
-    #]
-    #if tasks_still_needed < len(tasks_chosen):
-    #    tasks_chosen = np.random.choice(tasks_chosen, tasks_still_needed, replace=False)
-    #completed_tasks.extend(tasks_chosen)
-    #seen_conversations.extend([desired_tasks[t]['conversations'][0] for t in tasks_chosen])
-    #seen_conversations.extend([desired_tasks[t]['conversations'][1] for t in tasks_chosen])
-    #task_data.extend([desired_tasks[id] for id in tasks_chosen])
-
-    print(task_data)
     return task_data
 
 
 def return_task_data(worker_id, task_data):
     """ When worker doesn't complete a task, return it to the queue or
     change their onboarding status depending on the task"""
+    print("PUTTING STUFF BACK ON QUEUE")
     is_onboarding = False
 
     # un-list the task as one the worker has completed
     for subtask_data in task_data:
         if subtask_data['task_specs'].get('is_onboarding', False):
+            # onboarding tasks
             workers_to_onboarding_tasks_todo[worker_id].append(
                 subtask_data['task_specs']['internal_id'])
             is_onboarding = True
         else:
+            # main tasks
             workers_to_desired_tasks_completed[worker_id].remove(
                 subtask_data['task_specs']['internal_id'])
 
@@ -479,9 +469,9 @@ def get_onboarding_tasks(worker_id, tasks_per_hit):
             "Invalid number of onboarding tasks found!"
 
     # just return all onboarding tasks
+    workers_to_onboarding_tasks_todo[worker_id] = [] #onboarding_tasks_todo[num_tasks_to_return:]
     #num_tasks_to_return = min(len(onboarding_tasks_todo), tasks_per_hit)
     #onboarding_tasks_chosen = onboarding_tasks_todo[:num_tasks_to_return]
-    #workers_to_onboarding_tasks_todo[worker_id] = onboarding_tasks_todo[num_tasks_to_return:]
     #return [onboarding_tasks[id] for id in onboarding_tasks_chosen]
     return [onboarding_tasks[id] for id in onboarding_tasks_todo]
 
@@ -507,7 +497,7 @@ def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_d
         choice_response = float(response['speakerChoice'])
 
         # one or more msg was too short
-        if (not text_response) or (len(text_response) < 3):
+        if (not text_response) or (len(text_response) < 2):
             short_msg_flag = 1
 
         if not task_specs.get('is_onboarding', False):
@@ -596,9 +586,6 @@ def main(opt, task_config):
         with open(opt['bad_worker_file'], 'r') as bad_worker_fh:
             workers_to_block = [worker.strip() for worker in bad_worker_fh]
         bad_worker_fh = open(opt['bad_worker_file'], 'a')
-    else:
-        workers_to_block = []
-        bad_worker_fh = None
 
     try:
         # Initialize run information
