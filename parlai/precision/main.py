@@ -205,27 +205,28 @@ def setup_task_queue(opt):
             internal_id += 1
     else:
         # make random onboarding tasks
-        raise NotImplementedError("Provide hand-picked onboarding task for now")
-        num_onboarding_tasks = opt['num_onboarding_tasks']
-        num_qual1s = int(num_onboarding_tasks / 2)
-        num_qual2s = num_onboarding_tasks - num_qual1s
-        onboarding_model_comparison = opt['onboarding_model_comparison'].split(',')
-        if len(conv_ids_by_model[onboarding_model]) < num_onboarding_tasks * 3:
-            raise ValueError("Not enough model conversations for # onboarding tasks")
-        onboarding_model_convs = np.random.choice(
-            conv_ids_by_model[onboarding_model], num_qual1s + 2*num_qual2s, False
-        )
-        onboarding_human_convs = np.random.choice(
-            conv_ids_by_model['human_eval'], num_qual1s, False
-        )
-        for i in range(num_qual1s):
-            id1 = onboarding_model_convs[i]
-            id2 = onboarding_human_convs[i]
-            make_task_from_ids(
-                id1, id2, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
-                opt['question'], opt['correctness_is_flipped'], matchup='qual1', mode=opt['mode']
-            )
-            internal_id += 1
+        #raise NotImplementedError("Provide hand-picked onboarding task for now")
+        #num_onboarding_tasks = opt['num_onboarding_tasks']
+        #num_qual1s = int(num_onboarding_tasks / 2)
+        #num_qual2s = num_onboarding_tasks - num_qual1s
+        #onboarding_model_comparison = opt['onboarding_model_comparison'].split(',')
+        #if len(conv_ids_by_model[onboarding_model]) < num_onboarding_tasks * 3:
+        #    raise ValueError("Not enough model conversations for # onboarding tasks")
+        #onboarding_model_convs = np.random.choice(
+        #    conv_ids_by_model[onboarding_model], num_qual1s + 2*num_qual2s, False
+        #)
+        #onboarding_human_convs = np.random.choice(
+        #    conv_ids_by_model['human_eval'], num_qual1s, False
+        #)
+        #for i in range(num_qual1s):
+        #    id1 = onboarding_model_convs[i]
+        #    id2 = onboarding_human_convs[i]
+        #    make_task_from_ids(
+        #        id1, id2, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
+        #        opt['question'], opt['correctness_is_flipped'], matchup='qual1', mode=opt['mode']
+        #    )
+        #    internal_id += 1
+        print("No onboarding tasks!")
 
     #####
     ## Create main tasks
@@ -416,7 +417,6 @@ def get_new_task_data(worker, tasks_per_hit):
 def return_task_data(worker_id, task_data):
     """ When worker doesn't complete a task, return it to the queue or
     change their onboarding status depending on the task"""
-    print("PUTTING STUFF BACK ON QUEUE")
     is_onboarding = False
 
     # un-list the task as one the worker has completed
@@ -623,20 +623,20 @@ def main(opt, task_config):
             print("Finished running task.")
 
             world.shutdown()
-            print("Finished shutting down.")
+            #print("Finished shutting down.")
 
             to_save_data = world.prep_save_data(workers)
-            print("Finished preparing save data.")
+            #print("Finished preparing save data.")
 
             if not world.did_complete():
-                print("Didn't finish HIT. Returning task data...")
+                print("\tDidn't finish HIT. Returning task data...")
                 return_task_data(workers[0].worker_id, task_data)
             elif opt['block_on_onboarding']:
-                print("Reviewing onboarding...")
+                #print("Reviewing onboarding...")
                 check_and_update_worker_approval(
                     mturk_manager, workers[0].worker_id, opt['onboarding_threshold'], to_save_data
                 )
-                print("\tDone reviewing onboarding")
+                #print("\tDone reviewing onboarding")
 
             save_data(to_save_data, out_fh)
             return to_save_data

@@ -154,7 +154,13 @@ class ChatPane extends React.Component {
       'width': '100%', position: 'relative', 'overflowY': 'scroll'
     };
 
-    let chat_style = {
+    let left_chat_style = {
+      'width': '100%', height: '100%', 'paddingTop': '60px',
+      'paddingLeft': '20px', 'paddingRight': '20px',
+      'paddingBottom': '20px', 'overflowY': 'scroll'
+    };
+
+    let right_chat_style = {
       'width': '100%', height: '100%', 'paddingTop': '60px',
       'paddingLeft': '20px', 'paddingRight': '20px',
       'paddingBottom': '20px', 'overflowY': 'scroll'
@@ -171,16 +177,16 @@ class ChatPane extends React.Component {
       <div id="right-top-pane" style={top_pane_style}>
         <Grid className="show-grid" style={{width: 'auto'}}>
           <Row>
-            <Col sm={6}>
-              <div id="message-pane-segment-left" style={chat_style} >
+            <Col sm={8}>
+              <div id="message-pane-segment-left" style={left_chat_style} >
                 <XMessageList
                   {...this.props}
                   index={0}
                   />
               </div>
             </Col>
-            <Col sm={6}>
-              <div id="message-pane-segment-right" style={chat_style} >
+            <Col sm={4}>
+              <div id="message-pane-segment-right" style={right_chat_style} >
                 <XMessageList
                   {...this.props}
                   index={1}
@@ -448,7 +454,7 @@ class TaskDescription extends React.Component {
         <br/><br/>
 
         You should also provide a text justification of your decision.&nbsp;
-        <b>Failure to do so will result in your HITs being rejected.</b>
+        <b>Failure to do so will result in your HITs being rejected.</b>&nbsp;
         <br/><br/>
 
         You will do this for pairs of articles and sentences.&nbsp;

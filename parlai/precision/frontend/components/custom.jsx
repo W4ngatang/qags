@@ -171,7 +171,7 @@ class ChatPane extends React.Component {
       <div id="right-top-pane" style={top_pane_style}>
         <Grid className="show-grid" style={{width: 'auto'}}>
           <Row>
-            <Col sm={6}>
+            <Col sm={8}>
               <div id="message-pane-segment-left" style={chat_style} >
                 <XMessageList
                   {...this.props}
@@ -179,7 +179,7 @@ class ChatPane extends React.Component {
                   />
               </div>
             </Col>
-            <Col sm={6}>
+            <Col sm={4}>
               <div id="message-pane-segment-right" style={chat_style} >
                 <XMessageList
                   {...this.props}
@@ -447,17 +447,17 @@ class TaskDescription extends React.Component {
         The task is to determine if the sentences are factually correct given the contents of the article.
         Note that many sentences may contain portions of text copied directly from the article.
         Be careful as some sentences may be combinations of two different parts
-        of the article, resulting in sentences that overall aren't supported by the article.
-        If the sentence doesn't make sense, you should mark it as not supported.&nbsp;
+        of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
+        <b>If the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
         <br/><br/>
 
-        You should also provide a text justification of your decision.
-        <b>Failure to do so will result in your HITs being rejected.</b>
+        <b>You should provide a text justification of your decision.&nbsp;
+        Failure to do so will result in your HITs being rejected.</b>
         <br/><br/>
 
         You will do this for pairs of articles and sentences.&nbsp;
-        After you've made your selection, a [NEXT] button will appear on the left.
-        <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>
+        After you've made your selection, a [NEXT] button will appear on the left.&nbsp;
+        <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>&nbsp;
         NOTE: please be sure to only accept one of this task at a time.&nbsp;
         Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
         <br/><br/>
@@ -489,12 +489,12 @@ class TaskDescription extends React.Component {
           The task is to determine if the sentences are correct given the article.
           Note that many sentences may contain portions of text copied directly from the article.
           Be careful as some sentences may be combinations of two different parts
-          of the article, resulting in sentences that overall aren't supported by the article.
-          If the sentence is a fragment or doesn't make sense, you should mark it as not supported.
+          of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
+          <b>If the sentence is a fragment or doesn't make sense, you should mark it as not supported.</b>
           <br/><br/>
 
-          You should also provide a text justification of your decision.
-          Failure to do so will result in your HITs being rejected.
+          <b>You should provide a text justification of your decision.&nbsp;
+          Failure to do so will result in your HITs being rejected.</b>
           <br/><br/>
 
         </div>

@@ -2,22 +2,28 @@
 
 import os
 import re
+import ast
 import json
 import copy
 import random
 import itertools
 from collections import defaultdict
-import ipdb
 
+import ipdb
+import rouge
+import numpy as np
+import pandas as pd
+from scipy.stats import pearsonr, spearmanr
 from nltk.tokenize import sent_tokenize
 
 from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
                   filter_line_fseq, parse_generation, \
                   load_txt, load_json
+from eval_ppb_answers import evaluate, load_data, align_ans
 
 N_SAMPLES = 5
-
+MTURK_BAD_RESPONSES = ['[DISCONNECT]', '[RETURNED]']
 
 def extract_src_trg_gen_from_fseq_log():
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
@@ -186,9 +192,10 @@ def process_human_subset():
                 out_fh.write("\n".join(map(str, binary_scores)))
 
 
-REPLACE_PUNCT = {'-lrb-': '[', '-rrb-': ']'}
-NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m']
+REPLACE_PUNCT = {'-lrb-': '(', '-rrb-': ')', '-lsb-': '[', '-rsb-': ']'}
+NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m', '\'ve', '\'d', '?', '!', 'n\'t']
 NO_TRAILING_SPACE_PUNCT = [' `', ' \'']
+
 
 def detokenize_sent(sent):
     """ Detokenize sents for readability, including:
@@ -206,6 +213,7 @@ def detokenize_sent(sent):
         sent = sent.replace(f'{punct} ', punct)
     return sent
 
+
 def prepare_parlai_data():
     """ Prepare data for ParlAI mturk tasks """
 
@@ -213,23 +221,36 @@ def prepare_parlai_data():
     mdl_files = {
                  'src': 'data/subset-src.txt',
                  'bus': 'data/subset-bus.txt',
-                 'fas': 'data/subset-fan.txt',
+                 'fas': 'data/subset-fas.txt',
                  'pgc': 'data/subset-pgc.txt',
                  'trg': 'data/subset-trg.txt'
                 }
     srcs = [s.strip() for s in open(mdl_files['src'], encoding="utf-8")]
+
+    should_filter_length = 1
+    n_exs = 50
+
+    if should_filter_length:
+        #lens = np.array([len(s.split()) for s in srcs])
+        lens = np.array([len(s) for s in srcs])
+        idxs = lens.argsort()
+    else:
+        idxs = range(len(srcs))
+    idxs = idxs[:n_exs]
 
     # for each model
     for mdl_name, mdl_file in mdl_files.items():
         # load the generations
         gens = [g.strip() for g in open(mdl_file)]
         sent_data = []
-        para_file = f"data/mturk/summary/{mdl_name}_para.jsonl"
+        para_file = f"data/mturk/summary/{mdl_name}_para_short.jsonl"
 
         with open(para_file, 'w', encoding='utf-8') as para_fh:
-            for src_idx, (src, gen) in enumerate(zip(srcs, gens)):
+            #for src_idx, (src, gen) in enumerate(zip(srcs, gens)):
+            for src_idx in idxs.tolist():
+                src = srcs[src_idx]
+                gen = gens[src_idx]
 
-                # TODO(Alex): split the generations by sentence
                 gen_sents = [detokenize_sent(s) for s in sent_tokenize(gen)]
                 for sent_idx, sent in enumerate(gen_sents):
                     gen_d = {'dialog': [{'speaker': 'model', 'text': sent}],
@@ -246,17 +267,264 @@ def prepare_parlai_data():
                 para_fh.write(f"{json.dumps(para_d)}\n")
 
                 # write to jsonl
-                sent_file = f"data/mturk/summary/{mdl_name}_sents.jsonl"
+                sent_file = f"data/mturk/summary/{mdl_name}_sent_short.jsonl"
                 with open(sent_file, 'w', encoding='utf-8') as sent_fh:
                     for gen_d in sent_data:
                         sent_fh.write(f"{json.dumps(gen_d)}\n")
 
 
-    # do the same but splitting the source
+
+def evaluate_parlai_mturk():
+    """ """
+
+    idx2responses = defaultdict(lambda: defaultdict(list))
+    idx2data = dict()
+    worker2responses = defaultdict(list)
+    response_map = {'1': 'yes', '2': 'no'}
+
+    # some multiply-annotated tasks
+    #data_file = "data/mturk/summary/precision/mturk_data.09251348.jsonl"
+
+    # some annotations of gold trgs
+    data_file = "data/mturk/summary/precision/mturk_data.09251922.jsonl"
+
+    # 50 singly-labeled bus annotations
+    data_file = "data/mturk/summary/precision/mturk_data.09271534.jsonl"
+
+    # 50 singly-labeled trg annotations
+    data_file = "data/mturk/summary/precision/mturk_data.09271635.jsonl"
+
+    # 50 singly-labeled pgc annotations
+    #data_file = "data/mturk/summary/precision/mturk_data.09271736.jsonl"
+
+    #data_file = "tmp_mturk_data.jsonl"
+
+    onboard_keys = (('onboard-pcs-para', 1, -1), ('onboard-pcs-sent', 1, 0))
+    data = [ast.literal_eval(l) for l in open(data_file, encoding="utf-8")]
+
+    n_resps = 0
+    for datum in data:
+        for worker_id, worker in datum['worker_data'].items():
+            if worker['response']['text'] in MTURK_BAD_RESPONSES:
+                continue
+
+            # bookkeeping
+            n_resps += 1
+            worker2responses[worker_id].append(worker)
+
+            para_idx = tuple(worker['task_data'][0]['conversations'][0]['ex_idx'])
+            idx2data[para_idx] = worker['task_data'][0]['conversations'][0]['dialog'][0]['text']
+
+            sent_idxs = []
+            for task in worker['task_data']:
+                sent_idx = tuple(task['conversations'][1]['ex_idx'])
+                sent_idxs.append(sent_idx)
+                idx2data[sent_idx] = task['conversations'][1]['dialog'][0]['text']
+
+            resps = [d["speakerChoice"] for d in worker['response']['task_data']]
+
+            for sent_idx, resp in zip(sent_idxs, resps):
+                idx2responses[para_idx][sent_idx].append(resp)
+
+    print(f"Loaded data from {n_resps} HITS")
+    n_onboard = len(idx2responses[onboard_keys[0]][onboard_keys[1]])
+    print(f"\t# onboard: {n_onboard}")
+
+    print()
+    print(f"Paragraphs: {idx2responses.keys()}")
+    def print_response(par_idx):
+        src_key = ('src', par_idx, -1)
+        n_trgs = len(idx2responses[src_key])
+        print(f"Paragraph {par_idx}")
+        print(f"\t{idx2data[src_key]}")
+        for i in range(n_trgs):
+            trg_key = ('trg', par_idx, i)
+            print(f"\t{idx2responses[src_key][trg_key]}: {idx2data[trg_key]}")
+
+    ipdb.set_trace()
+
+
+def compute_correctness_judgments_rouge_correlations(turk_file, hyp_file, ref_file='data/subset-trg.txt'):
+    """ Compute sentence and system level correlations
+    between human annotations and ROUGE scores
+    """
+
+    resp_map = {'1': 1, '2': 0}
+
+    # Load mturk data
+    mturk_data = [ast.literal_eval(l) for l in open(turk_file, encoding="utf-8")]
+    idxs = []
+    idx2responses = defaultdict(lambda: defaultdict(list))
+    for datum in mturk_data:
+        for worker_id, worker in datum['worker_data'].items():
+            if worker['response']['text'] in MTURK_BAD_RESPONSES:
+                continue
+
+            para_idx = tuple(worker['task_data'][0]['conversations'][0]['ex_idx'])[1]
+            idxs.append(para_idx)
+
+            sent_idxs = [t['conversations'][1]['ex_idx'][2] for t in worker['task_data']]
+            resps = [d["speakerChoice"] for d in worker['response']['task_data']]
+            for sent_idx, resp in zip(sent_idxs, resps):
+                idx2responses[para_idx][sent_idx].append(resp)
+
+    human_scores = list()
+    idx2human = dict()
+    #for para_idx, para_d in idx2responses.items():
+    for para_idx in idxs:
+        para_d = idx2responses[para_idx]
+        if max(len(v) for v in para_d.values()) > 1:
+            ipdb.set_trace()
+        avg_score = sum(resp_map[v[0]] for v in para_d.values()) / len(para_d)
+        idx2human[para_idx] = avg_score
+        human_scores.append(avg_score)
+
+    all_hyps = [l.strip() for l in open(hyp_file, encoding='utf-8')]
+    all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
+    refs = [all_refs[idx] for idx in idxs]
+    hyps = [all_hyps[idx] for idx in idxs]
+
+    # compute ROUGE
+    rouge_eval = rouge.Rouge(metrics=['rouge-n', 'rouge-l'],
+                             max_n=4,
+                             limit_length=True,
+                             length_limit=100,
+                             length_limit_type='words',
+                             apply_avg=False,
+                             apply_best=False,
+                             alpha=0.5,
+                             weight_factor=1.2,
+                             stemming=True)
+    rouge_d = rouge_eval.get_scores(hyps, refs)
+    rouge_scores = [[] for _ in range(len(hyps))]
+    for metric_name, metric_d in rouge_d.items():
+        for ex_idx, ex_metrics in enumerate(metric_d):
+            rouge_scores[ex_idx].append(ex_metrics['f'][0])
+    rouge_scores = [sum(l) / len(rouge_d) for l in rouge_scores]
+
+    # compute agreement/correlation between metrics
+    pearson_corr = pearsonr(human_scores, rouge_scores)
+    spearman_corr = spearmanr(human_scores, rouge_scores)
+    print(f"Human correctness vs ROUGE (avg) pearson correlation: {pearson_corr}")
+    print(f"Human correctness vs ROUGE (avg) spearman correlation: {spearman_corr}")
+
+    #if qags_file is not None:
+    if True:
+        mdl = "bus"
+        n_qsts_per_doc = 10
+        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
+        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
+        srcs = load_data(qags_src_file)
+        trgs = load_data(qags_trg_file)
+        src_ans, trg_ans = align_ans(srcs, trgs)
+        all_qags_scores, _, _, _, _ = evaluate(tgts=src_ans, prds=trg_ans,
+                                               n_qsts_per_doc=n_qsts_per_doc,
+                                               metric_name="em")
+        qags_scores = [all_qags_scores[idx] for idx in idxs]
+        pearson_corr = pearsonr(human_scores, qags_scores)
+        spearman_corr = spearmanr(human_scores, qags_scores)
+        print(f"Human correctness vs QAGS pearson correlation: {pearson_corr}")
+        print(f"Human correctness vs QAGS spearman correlation: {spearman_corr}")
+
+    ipdb.set_trace()
+
+
+def compute_pair_judgments_rouge_correlations():
+    """ Compute sentence and system level correlations
+    between human annotations and ROUGE scores
+    """
+
+    model = "bus"
+
+    data_file = "data/mturk_summary_pair.csv"
+    all_data = pd.read_csv(data_file)
+
+    ref_file = 'data/subset-trg.txt'
+    all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
+    refs = []
+    hyps = []
+    choices = []
+    for idx, row in all_data.iterrows():
+        refs.append(all_refs[row['Input.idx']])
+        refs.append(all_refs[row['Input.idx']])
+        hyps.append(row['Input.summary1'])
+        hyps.append(row['Input.summary2'])
+        if row['Answer.choice.summary1']:
+            choices.append(1)
+        elif row['Answer.choice.summary2']:
+            choices.append(2)
+        elif row['Answer.choice.about-equal']:
+            choices.append(3)
+        else: # 'Answer.choice.cant-tell'
+            choices.append(4)
+
+    assert len(refs) == len(hyps)
+
+    rouge_eval = rouge.Rouge(metrics=['rouge-n', 'rouge-l'],
+                             max_n=4,
+                             limit_length=True,
+                             length_limit=100,
+                             length_limit_type='words',
+                             apply_avg=False,
+                             apply_best=False,
+                             alpha=0.5,
+                             weight_factor=1.2,
+                             stemming=True)
+
+    rouge_scores = rouge_eval.get_scores(hyps, refs)
+    def score(score_d, idx):
+        total_score = 0.
+        n_metrics = len(score_d)
+        for metric_name, metric_d in score_d.items():
+            total_score += metric_d[idx]['f'][0]
+        return total_score / n_metrics
+
+
+    n_agree = 0
+    n_canttell = 0
+    rouge_choices = []
+    scores1, scores2 = [], []
+    for i in range(int(len(refs) / 2)):
+        score1 = score(rouge_scores, 2*i)
+        score2 = score(rouge_scores, 2*i + 1)
+        scores1.append(score1)
+        scores2.append(score2)
+
+        if (abs(score1 - score2) < 0.01):
+            rouge_choices.append(3)
+        elif score1 > score2:
+            rouge_choices.append(1)
+        elif score1 < score2:
+            rouge_choices.append(2)
+
+        if (abs(score1 - score2) < 0.01 and choices[i] == 3) or \
+           (score1 > score2 and choices[i] == 1) or \
+           (score1 < score2 and choices[i] == 2):
+            n_agree += 1
+        if choices[i] == 4:
+            n_canttell += 1
+
+    print(f"ROUGE and human eval agree {n_agree}/{len(choices)} ({n_agree / len(choices)} %)")
+    print(f"\t# cant tell (human): {n_canttell}")
+
+    ipdb.set_trace()
+
+
+
+mdl2turk_data = {
+    "bus": "data/mturk/summary/precision/mturk_data.09271534.jsonl",
+    "trg": "data/mturk/summary/precision/mturk_data.09271635.jsonl",
+    "pgc": "data/mturk/summary/precision/mturk_data.09271736.jsonl"
+}
+mdl = "bus"
 
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
 #aggregate_questions()
 #format_abstractive_qa()
 #process_human_subset()
-prepare_parlai_data()
+#prepare_parlai_data()
+#evaluate_parlai_mturk()
+#compute_pair_judgments_rouge_correlations()
+compute_correctness_judgments_rouge_correlations(turk_file=mdl2turk_data[mdl],
+                                                 hyp_file=f"data/subset-{mdl}.txt")

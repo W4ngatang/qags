@@ -19,8 +19,12 @@ def set_args():
     args['pairs_per_matchup'] = 1 # 100
     args['annotations_per_pair'] = 1
 
+
+    # TODO(Alex): CHANGE ME!!!
+    args['is_sandbox'] = True
+    args['block_qualification'] = 'aw_block_qags_recall_r6'
+
     # Task definition
-    args['mode'] = 'recall'
     args['question'] = 'Is the main idea of the sentence captured by the article ?'
     args['s1_choice'] = ''
     args['s2_choice'] = ''
@@ -35,7 +39,6 @@ def set_args():
         (("onboard-rcl-para", 0, -1), ("onboard-rcl-sent", 0, 3), 'qual-rcl'),
         ]
     args['comparisons_per_hit'] = 4
-    args['block_qualification'] = 'aw_block_qags_recall_r6'
     args['block_on_onboarding'] = True
     args['onboarding_threshold'] = 1.0
 
@@ -47,7 +50,6 @@ def set_args():
 
     # Additional args that can be set - here we show the default values.
     # For a full list, refer to run.py & the ParlAI/parlai/params.py
-    args['is_sandbox'] = True
     # args['seed'] = 42
 
     return args
