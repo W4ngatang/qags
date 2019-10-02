@@ -25,6 +25,7 @@ from eval_ppb_answers import evaluate, load_data, align_ans
 N_SAMPLES = 5
 MTURK_BAD_RESPONSES = ['[DISCONNECT]', '[RETURNED]']
 
+
 def extract_src_trg_gen_from_fseq_log():
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
     from fseq logs and write each as a text file, one text per line. """
@@ -226,8 +227,10 @@ def prepare_parlai_data():
                  'trg': 'data/subset-trg.txt'
                 }
     srcs = [s.strip() for s in open(mdl_files['src'], encoding="utf-8")]
+    srcs_sents = [[detokenize_sent(s) for s in sent_tokenize(src)] for src in srcs]
 
     should_filter_length = 1
+    should_add_attn_task = 1
     n_exs = 50
 
     if should_filter_length:
@@ -243,12 +246,13 @@ def prepare_parlai_data():
         # load the generations
         gens = [g.strip() for g in open(mdl_file)]
         sent_data = []
-        para_file = f"data/mturk/summary/{mdl_name}_para_short.jsonl"
+        para_file = f"data/mturk/summary/{mdl_name}_para_short_attn.jsonl"
 
         with open(para_file, 'w', encoding='utf-8') as para_fh:
             #for src_idx, (src, gen) in enumerate(zip(srcs, gens)):
             for src_idx in idxs.tolist():
                 src = srcs[src_idx]
+                src_sents = srcs_sents[src_idx]
                 gen = gens[src_idx]
 
                 gen_sents = [detokenize_sent(s) for s in sent_tokenize(gen)]
@@ -256,6 +260,25 @@ def prepare_parlai_data():
                     gen_d = {'dialog': [{'speaker': 'model', 'text': sent}],
                              'ex_idx': (mdl_name, src_idx, sent_idx),
                              'para_idx': sent_idx
+                            }
+                    sent_data.append(gen_d)
+
+                if should_add_attn_task:
+                    use_negative = bool(random.random() > 0.5)
+                    if use_negative:
+                        # negative attn task
+                        sent = random.choice(gen_sents).split()
+                        random.shuffle(sent)
+                        sent = ' '.join(sent).lower().capitalize()
+                    else:
+                        # positive attn task
+                        sent = src_sents[min(len(src_sents), 3)]
+
+                    sent_idx = -2
+                    gen_d = {'dialog': [{'speaker': 'model', 'text': sent}],
+                             'ex_idx': (mdl_name, src_idx, sent_idx),
+                             'para_idx': sent_idx,
+                             'answer': 'no' if use_negative else 'yes'
                             }
                     sent_data.append(gen_d)
 
@@ -267,39 +290,24 @@ def prepare_parlai_data():
                 para_fh.write(f"{json.dumps(para_d)}\n")
 
                 # write to jsonl
-                sent_file = f"data/mturk/summary/{mdl_name}_sent_short.jsonl"
+                sent_file = f"data/mturk/summary/{mdl_name}_sent_short_attn.jsonl"
                 with open(sent_file, 'w', encoding='utf-8') as sent_fh:
                     for gen_d in sent_data:
                         sent_fh.write(f"{json.dumps(gen_d)}\n")
 
 
 
-def evaluate_parlai_mturk():
-    """ """
+def evaluate_parlai_mturk(data_file, mdl):
+    """ Do basic data analysis on mturk data (run through ParlAI)
+    data_file should be jsonl
+    """
 
     idx2responses = defaultdict(lambda: defaultdict(list))
     idx2data = dict()
     worker2responses = defaultdict(list)
     response_map = {'1': 'yes', '2': 'no'}
 
-    # some multiply-annotated tasks
-    #data_file = "data/mturk/summary/precision/mturk_data.09251348.jsonl"
-
-    # some annotations of gold trgs
-    data_file = "data/mturk/summary/precision/mturk_data.09251922.jsonl"
-
-    # 50 singly-labeled bus annotations
-    data_file = "data/mturk/summary/precision/mturk_data.09271534.jsonl"
-
-    # 50 singly-labeled trg annotations
-    data_file = "data/mturk/summary/precision/mturk_data.09271635.jsonl"
-
-    # 50 singly-labeled pgc annotations
-    #data_file = "data/mturk/summary/precision/mturk_data.09271736.jsonl"
-
-    #data_file = "tmp_mturk_data.jsonl"
-
-    onboard_keys = (('onboard-pcs-para', 1, -1), ('onboard-pcs-sent', 1, 0))
+    #onboard_keys = (('onboard-pcs-para', 1, -1), ('onboard-pcs-sent', 1, 0))
     data = [ast.literal_eval(l) for l in open(data_file, encoding="utf-8")]
 
     n_resps = 0
@@ -326,29 +334,56 @@ def evaluate_parlai_mturk():
             for sent_idx, resp in zip(sent_idxs, resps):
                 idx2responses[para_idx][sent_idx].append(resp)
 
-    print(f"Loaded data from {n_resps} HITS")
-    n_onboard = len(idx2responses[onboard_keys[0]][onboard_keys[1]])
-    print(f"\t# onboard: {n_onboard}")
 
-    print()
-    print(f"Paragraphs: {idx2responses.keys()}")
+    def print_ids():
+        n_hits, n_tasks = 0, 0
+        n_yes, n_no = 0, 0
+        n_all_yes, n_all_no = 0, 0
+        multiresponse_idxs = []
+        all_no_idxs = []
+        for k, v in idx2responses.items():
+            n_responses = max(len(vv) for vv in v.values())
+            resps = [1 if vv[0] == '1' else 0 for vv in v.values()]
+            n_all_yes += int(sum(resps) == len(v))
+            n_all_no += int(sum(resps) == 0)
+            n_yes += sum(resps)
+            n_no += len(v) - sum(resps)
+            n_tasks += len(v)
+            n_hits += n_responses
+
+            if n_responses > 1:
+                multiresponse_idxs.append(k)
+            if not sum(resps):
+                all_no_idxs.append(k)
+            print(f"{k[1]}: {n_responses} responses")
+
+        print(f"loaded data from {n_hits} hits for {mdl}")
+        print(f"# examples w/ >1 responses: {len(multiresponse_idxs)}")
+        print(f"\tids: {multiresponse_idxs}")
+
+        assert n_tasks == (n_yes + n_no)
+        print(f"\tn yes: {n_yes}, n no: {n_no}, n all yes {n_all_yes}, n all no: {n_all_no}")
+        print(f"\tall no idxs: {all_no_idxs}")
+
     def print_response(par_idx):
         src_key = ('src', par_idx, -1)
         n_trgs = len(idx2responses[src_key])
         print(f"Paragraph {par_idx}")
         print(f"\t{idx2data[src_key]}")
         for i in range(n_trgs):
-            trg_key = ('trg', par_idx, i)
+            trg_key = (mdl, par_idx, i)
             print(f"\t{idx2responses[src_key][trg_key]}: {idx2data[trg_key]}")
 
+    print_ids()
     ipdb.set_trace()
 
 
-def compute_correctness_judgments_rouge_correlations(turk_file, hyp_file, ref_file='data/subset-trg.txt'):
+def compute_correctness_judgments_rouge_correlations(turk_file, hyp_file, mdl, ref_file='data/subset-trg.txt'):
     """ Compute sentence and system level correlations
     between human annotations and ROUGE scores
     """
 
+    # 1 is YES, 2 is NO
     resp_map = {'1': 1, '2': 0}
 
     # Load mturk data
@@ -369,14 +404,13 @@ def compute_correctness_judgments_rouge_correlations(turk_file, hyp_file, ref_fi
                 idx2responses[para_idx][sent_idx].append(resp)
 
     human_scores = list()
-    idx2human = dict()
     #for para_idx, para_d in idx2responses.items():
     for para_idx in idxs:
         para_d = idx2responses[para_idx]
         if max(len(v) for v in para_d.values()) > 1:
-            ipdb.set_trace()
+            #ipdb.set_trace()
+            pass
         avg_score = sum(resp_map[v[0]] for v in para_d.values()) / len(para_d)
-        idx2human[para_idx] = avg_score
         human_scores.append(avg_score)
 
     all_hyps = [l.strip() for l in open(hyp_file, encoding='utf-8')]
@@ -384,7 +418,7 @@ def compute_correctness_judgments_rouge_correlations(turk_file, hyp_file, ref_fi
     refs = [all_refs[idx] for idx in idxs]
     hyps = [all_hyps[idx] for idx in idxs]
 
-    # compute ROUGE
+    # compute ROUGE as average of ROUGE-* F1 scores
     rouge_eval = rouge.Rouge(metrics=['rouge-n', 'rouge-l'],
                              max_n=4,
                              limit_length=True,
@@ -408,25 +442,23 @@ def compute_correctness_judgments_rouge_correlations(turk_file, hyp_file, ref_fi
     print(f"Human correctness vs ROUGE (avg) pearson correlation: {pearson_corr}")
     print(f"Human correctness vs ROUGE (avg) spearman correlation: {spearman_corr}")
 
-    #if qags_file is not None:
-    if True:
-        mdl = "bus"
-        n_qsts_per_doc = 10
-        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
-        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
-        srcs = load_data(qags_src_file)
-        trgs = load_data(qags_trg_file)
-        src_ans, trg_ans = align_ans(srcs, trgs)
-        all_qags_scores, _, _, _, _ = evaluate(tgts=src_ans, prds=trg_ans,
-                                               n_qsts_per_doc=n_qsts_per_doc,
-                                               metric_name="em")
-        qags_scores = [all_qags_scores[idx] for idx in idxs]
-        pearson_corr = pearsonr(human_scores, qags_scores)
-        spearman_corr = spearmanr(human_scores, qags_scores)
-        print(f"Human correctness vs QAGS pearson correlation: {pearson_corr}")
-        print(f"Human correctness vs QAGS spearman correlation: {spearman_corr}")
+    n_qsts_per_doc = 10
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
+    srcs = load_data(qags_src_file)
+    trgs = load_data(qags_trg_file)
+    src_ans, trg_ans = align_ans(srcs, trgs)
+    all_qags_scores, _, _, _, _ = evaluate(tgts=src_ans, prds=trg_ans,
+                                           n_qsts_per_doc=n_qsts_per_doc,
+                                           metric_name="em")
+    qags_scores = [all_qags_scores[idx] for idx in idxs]
+    pearson_corr = pearsonr(human_scores, qags_scores)
+    spearman_corr = spearmanr(human_scores, qags_scores)
+    print(f"Human correctness vs QAGS pearson correlation: {pearson_corr}")
+    print(f"Human correctness vs QAGS spearman correlation: {spearman_corr}")
 
     ipdb.set_trace()
+
 
 
 def compute_pair_judgments_rouge_correlations():
@@ -514,7 +546,8 @@ def compute_pair_judgments_rouge_correlations():
 mdl2turk_data = {
     "bus": "data/mturk/summary/precision/mturk_data.09271534.jsonl",
     "trg": "data/mturk/summary/precision/mturk_data.09271635.jsonl",
-    "pgc": "data/mturk/summary/precision/mturk_data.09271736.jsonl"
+    "pgc": "data/mturk/summary/precision/mturk_data.09271736.jsonl",
+    "fas": "data/mturk/summary/precision/mturk_data.10011138.jsonl"
 }
 mdl = "bus"
 
@@ -523,8 +556,12 @@ mdl = "bus"
 #aggregate_questions()
 #format_abstractive_qa()
 #process_human_subset()
-#prepare_parlai_data()
-#evaluate_parlai_mturk()
 #compute_pair_judgments_rouge_correlations()
-compute_correctness_judgments_rouge_correlations(turk_file=mdl2turk_data[mdl],
-                                                 hyp_file=f"data/subset-{mdl}.txt")
+
+prepare_parlai_data()
+
+#evaluate_parlai_mturk(mdl2turk_data[mdl], mdl)
+
+#compute_correctness_judgments_rouge_correlations(turk_file=mdl2turk_data[mdl],
+#                                                 hyp_file=f"data/subset-{mdl}.txt",
+#                                                 mdl=mdl)

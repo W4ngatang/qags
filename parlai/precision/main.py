@@ -6,14 +6,15 @@
 import os
 import json
 import time
-#import ipdb
-
+import random
 from queue import Queue
+
 import numpy as np
 
 from parlai.core.params import ParlaiParser
 from parlai.mturk.core.mturk_manager import StaticMTurkManager
 from parlai.mturk.core.worlds import StaticMTurkTaskWorld
+from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
 #from parlai_internal.mturk.tasks.pairwise_dialogue_eval.task_config\
 #    import task_config
 import parlai.mturk.core.mturk_utils as mturk_utils
@@ -25,9 +26,11 @@ task_queue = Queue()
 
 onboarding_tasks = {}
 onboarding_conv_ids = []
-ONBOARD_FAIL_MSG = 'Failed quality control check'
-SHORT_RESPONSE_MSG = 'Provided reason is too short'
 onboarding_failed_workers = []
+ONBOARD_FAIL_MSG = 'Did not pass onboarding'
+SHORT_RESPONSE_MSG = 'Provided reason is too short'
+SHORT_TIME_MSG = 'Failed quality control'
+FAIL_ATTN_MSG = 'Failed quality control task'
 
 desired_tasks = {}
 conversations_to_tasks = {}
@@ -204,28 +207,6 @@ def setup_task_queue(opt):
 
             internal_id += 1
     else:
-        # make random onboarding tasks
-        #raise NotImplementedError("Provide hand-picked onboarding task for now")
-        #num_onboarding_tasks = opt['num_onboarding_tasks']
-        #num_qual1s = int(num_onboarding_tasks / 2)
-        #num_qual2s = num_onboarding_tasks - num_qual1s
-        #onboarding_model_comparison = opt['onboarding_model_comparison'].split(',')
-        #if len(conv_ids_by_model[onboarding_model]) < num_onboarding_tasks * 3:
-        #    raise ValueError("Not enough model conversations for # onboarding tasks")
-        #onboarding_model_convs = np.random.choice(
-        #    conv_ids_by_model[onboarding_model], num_qual1s + 2*num_qual2s, False
-        #)
-        #onboarding_human_convs = np.random.choice(
-        #    conv_ids_by_model['human_eval'], num_qual1s, False
-        #)
-        #for i in range(num_qual1s):
-        #    id1 = onboarding_model_convs[i]
-        #    id2 = onboarding_human_convs[i]
-        #    make_task_from_ids(
-        #        id1, id2, internal_id, all_conv_data, opt['s1_choice'], opt['s2_choice'],
-        #        opt['question'], opt['correctness_is_flipped'], matchup='qual1', mode=opt['mode']
-        #    )
-        #    internal_id += 1
         print("No onboarding tasks!")
 
     #####
@@ -271,8 +252,12 @@ def setup_task_queue(opt):
                 assert len(pars) == 1, print(f"Found too many items for {par_idx}")
                 par_id = pars[0]
 
-                sent_ids = [id for id in conv_ids_by_model[model_1] if id[1] == par_idx]
+                sent_ids = [id for id in conv_ids_by_model[model_1] if id[1] == par_idx and id[2] != -2]
                 sent_ids.sort(key=lambda x: x[2])
+                attn_id = [id for id in conv_ids_by_model[model_1] if id[1] == par_idx and id[2] == -2]
+                if attn_id: # attention task
+                    assert len(attn_id) == 1, "More than one attn id found!"
+                    sent_ids.insert(random.randrange(len(sent_ids) + 1), attn_id[0])
 
                 par_tasks = []
                 for sent_id in sent_ids:
@@ -371,6 +356,7 @@ def make_task_from_ids(
     specs['correctness_is_flipped'] = is_flipped
     specs['speakers_to_eval'] = ['model', 'model']
     specs['mode'] = mode
+    specs['answer'] = conv2["answer"] if "answer" in conv2 else None
     if matchup.startswith('qual'):
         specs['is_onboarding'] = True
         specs['answer'] = conv2["answer"] if "answer" in conv2 else None
@@ -476,10 +462,12 @@ def get_onboarding_tasks(worker_id, tasks_per_hit):
     return [onboarding_tasks[id] for id in onboarding_tasks_todo]
 
 
-def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_data,
-        bad_worker_fh=None):
+def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
+                                     onboard_threshold, min_time_threshold=None,
+                                     bad_worker_fh=None):
     """ Reject and soft block workers who fail onboarding tasks """
 
+    worker_id = [k for k in save_data['worker_data'].keys()][0]
     worker_data = save_data['worker_data'][worker_id]
     task_data = worker_data['task_data']
     responses = worker_data['response']
@@ -488,18 +476,33 @@ def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_d
 
     short_msg_flag = 0
     short_time_flag = 0 # currently not used
+    fail_attn_flag = 0
+
+    # min time check
+    if min_time_threshold is not None:
+        resp = data_handler.get_worker_assignment_pairing(worker_id, worker_data['assignment_id'])
+        hit_time = resp['task_end'] - resp['task_start']
+        short_time_flag = bool(hit_time < min_time_threshold)
 
     # check the tasks
     for i, task_datum in enumerate(task_data):
         task_specs = task_datum['task_specs']
         response = responses['task_data'][i]
-        text_response = response['textReason']
+        text_response = response.get('textReason', '')
         choice_response = float(response['speakerChoice'])
 
         # one or more msg was too short
         if (not text_response) or (len(text_response) < 2):
             short_msg_flag = 1
 
+        # attn check
+        if task_specs['answer'] is not None:
+            expected_response = 1 if task_specs['answer'] == 'yes' else 2
+            fail_attn_flag = bool(choice_response != expected_response) or fail_attn_flag
+
+
+
+        # EVERYTHING AFTER THIS ONLY IS FOR ONBOARDING TASKS
         if not task_specs.get('is_onboarding', False):
             continue
 
@@ -518,15 +521,31 @@ def check_and_update_worker_approval(mturk_manager, worker_id, threshold, save_d
 
     # review for non-onboarding tasks
     if num_onboarding_tasks == 0:
+        fail_msg = ''
 
         # auto-fail workers who didn't pass onboarding
         if worker_id in onboarding_failed_workers:
-            mturk_manager.reject_work(worker_data['assignment_id'], ONBOARD_FAIL_MSG)
-            return_task_data(worker_id, task_data)
+            print(f"\tWorker {worker_id} failed onboarding")
+            fail_msg = ONBOARD_FAIL_MSG
+
+        # fail workers who worked implausibly quickly
+        if short_msg_flag:
+            print(f"\tWorker {worker_id} gave too short a message")
+            fail_msg = SHORT_RESPONSE_MSG
 
         # fail workers who msgs were too short
-        if short_msg_flag:
-            mturk_manager.reject_work(worker_data['assignment_id'], SHORT_RESPONSE_MSG)
+        if short_time_flag:
+            print(f"\tWorker {worker_id} finished too quickly")
+            fail_msg = SHORT_TIME_MSG
+
+        # fail workers who failed attn task
+        if fail_attn_flag:
+            print(f"\tWorker {worker_id} failed attention task")
+            fail_msg = FAIL_ATTN_MSG
+
+        # actually do the failing
+        if fail_msg:
+            mturk_manager.reject_work(worker_data['assignment_id'], fail_msg)
             return_task_data(worker_id, task_data)
 
         return
@@ -578,8 +597,23 @@ def main(opt, task_config):
     # Soon will support this behavior automatically
     mturk_manager.set_onboard_function(onboard_function=None)
 
+    data_handler = MTurkDataHandler(task_group_id=mturk_manager.task_group_id,
+                                    file_name='pmt_sbdata.db' if opt['is_sandbox'] else 'pmt_data.db')
+
     if opt['block_on_onboarding'] and opt['block_qualification'] is None:
         raise Exception("You must set block_qualification or set block_on_onboarding to False")
+    qualifications = [
+        { # number of HITS approved
+            'QualificationTypeId': '00000000000000000040',
+            'Comparator':'GreaterThan',
+            'IntegerValues':[0] # TODO(Alex): update
+        },
+        { # percent approved
+            'QualificationTypeId': '000000000000000000L0',
+            'Comparator':'GreaterThan',
+            'IntegerValues':[0] # TODO(Alex): update
+        }
+    ]
 
     out_fh = open(opt['out_file'], 'w')
     if opt['bad_worker_file'] is not None:
@@ -595,7 +629,7 @@ def main(opt, task_config):
         mturk_manager.ready_to_accept_workers()
 
         # Create the hits as specified by command line arguments
-        mturk_manager.create_hits()
+        mturk_manager.create_hits(qualifications=qualifications)
 
         if opt['bad_worker_file'] is not None:
             for worker_id in workers_to_block:
@@ -633,9 +667,10 @@ def main(opt, task_config):
                 return_task_data(workers[0].worker_id, task_data)
             elif opt['block_on_onboarding']:
                 #print("Reviewing onboarding...")
-                check_and_update_worker_approval(
-                    mturk_manager, workers[0].worker_id, opt['onboarding_threshold'], to_save_data
-                )
+                check_and_update_worker_approval(mturk_manager, data_handler,
+                                                 to_save_data,
+                                                 opt['onboarding_threshold'],
+                                                 opt['min_time_threshold'])
                 #print("\tDone reviewing onboarding")
 
             save_data(to_save_data, out_fh)

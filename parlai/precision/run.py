@@ -16,8 +16,13 @@ def set_args():
     args['model_comparisons'] = [
                                  #('src_para_short', 'bus_sent_short'),
                                  #('src_para_short', 'fas_sent_short'),
-                                 ('src_para_short', 'pgc_sent_short'),
+                                 #('src_para_short', 'pgc_sent_short'),
                                  #('src_para_short', 'trg_sent_short')
+
+                                 #('src_para_short_attn', 'bus_sent_short_attn'),
+                                 #('src_para_short_attn', 'fas_sent_short_attn'),
+                                 ('src_para_short_attn', 'pgc_sent_short_attn'),
+                                 #('src_para_short_attn', 'trg_sent_short_attn'),
                                 ]
     args['pairs_per_matchup'] = 50
     args['annotations_per_pair'] = 1 # 1
@@ -26,6 +31,7 @@ def set_args():
     # TODO(Alex): CHANGE ME!!!
     args['is_sandbox'] = False
     args['block_qualification'] = 'aw_block_qags_precision_r8'
+    args['min_time_threshold'] = 15
 
     # Task definition
     args['mode'] = 'precision'
