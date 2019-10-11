@@ -132,38 +132,37 @@ function predict_extractive() {
 
     date="06-25-2019"
     squad_version="v2_0"
+    qg_ckpt="best"
     n_qsts=10
 
     #for gen_mdl in bus-subset fan-subset pgc-subset; do
-    for qg_ckpt in 1 3 5 7 10 15 20 25; do
-        for txt_fld in gen src; do
-            #for qst_src in gen src; do
-            gen_mdl="bus-subset"
+    for txt_fld in gen src; do
+        #for qst_src in gen src; do
+        gen_mdl="bus-subset"
 
-            #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
-            pred_file="/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
-            mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
-            out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
-            out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
-            mkdir -p ${out_dir}
+        #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
+        pred_file="/private/home/wangalexc/projects/qags/data/subset500/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
+        mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
+        out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
+        out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
+        mkdir -p ${out_dir}
 
-            # NOTE(Alex): maybe need --version_2_with_negative \
-            python finetune_pt_squad.py \
-              --bert_model ${bert_version} \
-              --do_predict \
-              --do_lower_case \
-              --predict_file ${pred_file} \
-              --max_seq_length 384 \
-              --doc_stride 128 \
-              --output_dir ${out_dir} \
-              --prediction_file ${out_file} \
-              --overwrite_output_dir \
-              --load_model_from_dir ${mdl_dir} \
-              --version_2_with_negative;
+        # NOTE(Alex): maybe need --version_2_with_negative \
+        python finetune_pt_squad.py \
+          --bert_model ${bert_version} \
+          --do_predict \
+          --do_lower_case \
+          --predict_file ${pred_file} \
+          --max_seq_length 384 \
+          --doc_stride 128 \
+          --output_dir ${out_dir} \
+          --prediction_file ${out_file} \
+          --overwrite_output_dir \
+          --load_model_from_dir ${mdl_dir} \
+          --version_2_with_negative;
 
-            #done;
-        done;
-    done
+        #done;
+    done;
 
 }
 

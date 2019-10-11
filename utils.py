@@ -16,7 +16,7 @@ def filter_line_fseq(line):
 
 def load_txt(data_file):
     """ Load a txt file with a text per line. """
-    return open(data_file, encoding="utf-8").readlines()
+    return [r.strip() for r in open(data_file, encoding="utf-8")]
 
 def load_json(data_file):
     """ """

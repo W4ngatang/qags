@@ -167,6 +167,10 @@ def setup_task_queue(opt):
         full_data_fn = os.path.join(data_folder, data_fn)
         if os.path.isdir(full_data_fn):
             continue
+        prefix = data_fn.split('.')[0]
+        # NOTE(Alex): not handling onboarding tasks properly
+        if prefix not in [m for pair in opt['model_comparisons'] for m in pair]:
+            continue
 
         print(f"Loading data from {full_data_fn}")
         with open(full_data_fn, 'r', encoding='utf-8') as dialog_data_file:
@@ -606,12 +610,14 @@ def main(opt, task_config):
         { # number of HITS approved
             'QualificationTypeId': '00000000000000000040',
             'Comparator':'GreaterThan',
-            'IntegerValues':[0] # TODO(Alex): update
+            #'IntegerValues':[1000]
+            'IntegerValues':[0]
         },
         { # percent approved
             'QualificationTypeId': '000000000000000000L0',
             'Comparator':'GreaterThan',
-            'IntegerValues':[0] # TODO(Alex): update
+            #'IntegerValues':[98]
+            'IntegerValues':[0]
         }
     ]
 
