@@ -98,18 +98,12 @@ def aggregate_questions():
     #for model in ["pgc-subset", "fan-subset", "bus-subset"]:
     for ckpt in ["best"]:
         for n_qsts in [5]:
-            model = "bus-subset"
+            model = "trg-subset500"
 
-            #src_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.src-onmt-order.cnndm.test.out"
-            #trg_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg-onmt-order.cnndm.test.out"
-            #gen_qst_file = f"/checkpoint/wangalexc/fairseq/07-18-2019/qst.{model}.cnndm.test.out"
-
-            src_qst_file = f"/checkpoint/wangalexc/fairseq/10-11-2019/qst5-ckpt{ckpt}.src-subset.cnndm.test.txt"
-            gen_qst_file = f"/checkpoint/wangalexc/fairseq/11-11-2019/qst5-ckpt{ckpt}.{model}.cnndm.test.txt"
-
+            src_qst_file = f"/checkpoint/wangalexc/fairseq/10-11-2019/qst5-ckpt{ckpt}.src-subset500.cnndm.test.txt"
+            gen_qst_file = f"/checkpoint/wangalexc/fairseq/10-11-2019/qst5-ckpt{ckpt}.{model}.cnndm.test.txt"
             qst_files = {
                          "src": src_qst_file,
-                         #"trg": trg_qst_file,
                          "gen": gen_qst_file
                         }
 
@@ -136,7 +130,7 @@ def aggregate_questions():
                     raw_data[k] = {txt_fld: txt, "hypotheses": qst}
 
                 data = format_squad(raw_data, context=txt_fld)
-                out_dir = f"/private/home/wangalexc/projects/qags/data/labeled-subset/{model}"
+                out_dir = f"/private/home/wangalexc/projects/qags/data/subset500/{model}"
                 out_file = f"{out_dir}/qst{n_qsts}-ckpt{ckpt}-{qst_src}.cnndm-{txt_fld}.json"
                 if not os.path.exists(out_dir):
                     os.mkdir(out_dir)
@@ -817,15 +811,16 @@ mdl = "bus"
 
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
-#aggregate_questions()
 #format_abstractive_qa()
 #process_human_subset()
 #compute_pair_judgments_rouge_correlations()
 
+aggregate_questions()
+
 #align_summaries()
 #prepare_parlai_data()
 
-evaluate_parlai_mturk(mdl2turk_data[mdl], mdl)
+#evaluate_parlai_mturk(mdl2turk_data[mdl], mdl)
 
 #compute_correctness_judgments_rouge_correlations(turk_files=mdl2turk_data[mdl],
 #                                                 hyp_file=f"data/subset-{mdl}.txt",
