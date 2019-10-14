@@ -610,14 +610,12 @@ def main(opt, task_config):
         { # number of HITS approved
             'QualificationTypeId': '00000000000000000040',
             'Comparator':'GreaterThan',
-            #'IntegerValues':[1000]
-            'IntegerValues':[0]
+            'IntegerValues':[opt['qual_n_hits_approved']]
         },
         { # percent approved
             'QualificationTypeId': '000000000000000000L0',
             'Comparator':'GreaterThan',
-            #'IntegerValues':[98]
-            'IntegerValues':[0]
+            'IntegerValues':[opt['qual_percent_hits_approved']]
         }
     ]
 

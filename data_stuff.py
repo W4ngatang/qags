@@ -620,8 +620,10 @@ def compute_correctness_judgments_rouge_correlations(turk_files, hyp_file, mdl, 
         """
         all_hyps = [l.strip() for l in open(hyp_file, encoding='utf-8')]
         all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
-        refs = [all_refs[idx] for idx in idxs]
-        hyps = [all_hyps[idx] for idx in idxs]
+        #refs = [all_refs[idx] for idx in idxs]
+        #hyps = [all_hyps[idx] for idx in idxs]
+        refs = [all_refs[idx % len(all_refs)] for idx in idxs]
+        hyps = [all_hyps[idx % len(all_hyps)] for idx in idxs]
 
         rouge_scores = get_rouge_scores(hyps, refs)
         pearson_corr = pearsonr(scores, rouge_scores)
@@ -637,7 +639,8 @@ def compute_correctness_judgments_rouge_correlations(turk_files, hyp_file, mdl, 
         qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
         qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
         all_qags_scores = get_qags_scores(qags_src_file, qags_trg_file, metric_name)
-        qags_scores = [all_qags_scores[idx] for idx in idxs]
+        #qags_scores = [all_qags_scores[idx] for idx in idxs]
+        qags_scores = [all_qags_scores[idx % len(all_qags_scores)] for idx in idxs]
         pearson_corr = pearsonr(scores, qags_scores)
         spearman_corr = spearmanr(scores, qags_scores)
         print(f"pearson correlation w/ QAGS {metric_name}: {pearson_corr}")
@@ -793,7 +796,12 @@ mdl2turk_data = {
     #"bus": ["data/mturk/summary/precision/mturk_data.09271534.jsonl",
     #        "data/mturk/summary/precision/mturk_data.10041456.jsonl",
     #        "data/mturk/summary/precision/mturk_data.10071418.jsonl"],
-    "bus": ["data/mturk/summary/precision/mturk_data.10111337.jsonl"],
+    "bus": ["data/mturk/summary/precision/mturk_data.10111337.jsonl",
+            # NOTE(Alex): 10/14 10:59 didn't use HIT requirements
+            "data/mturk/summary/precision/mturk_data.10141059.jsonl",
+            # NOTE(Alex): contains 2x annotations / task
+            "data/mturk/summary/precision/mturk_data.101412XX.jsonl",
+           ],
 
     "trg": ["data/mturk/summary/precision/mturk_data.09271635.jsonl"],
 
@@ -825,11 +833,11 @@ mdl = "bus"
 #align_summaries()
 #prepare_parlai_data()
 
-evaluate_parlai_mturk(mdl2turk_data[mdl], mdl)
+#evaluate_parlai_mturk(mdl2turk_data[mdl], mdl)
 
-#compute_correctness_judgments_rouge_correlations(turk_files=mdl2turk_data[mdl],
-#                                                 hyp_file=f"data/subset-{mdl}.txt",
-#                                                 mdl=mdl)
+compute_correctness_judgments_rouge_correlations(turk_files=mdl2turk_data[mdl],
+                                                 hyp_file=f"data/subset-{mdl}.txt",
+                                                 mdl=mdl)
 
 #mturk_posthoc()
 #mturk_review_hits()

@@ -37,14 +37,15 @@ def set_args():
 
                                 ]
     args['pairs_per_matchup'] = 100
-    args['annotations_per_pair'] = 1 # 1
-
+    args['annotations_per_pair'] = 2
 
     # TODO(Alex): CHANGE ME!!!
-    # NOTE(Alex): TURN ON HIT QUALIFICATIONS
     args['is_sandbox'] = False
+    args['qual_percent_hits_approved'] = 98
+    args['qual_n_hits_approved'] = 1000
     args['block_qualification'] = 'aw_block_qags_precision_r8'
     args['min_time_threshold'] = 15
+
 
     # Task definition
     args['mode'] = 'precision'
