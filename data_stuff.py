@@ -3,10 +3,12 @@
 import os
 import re
 import ast
+import time
 import json
 import copy
 import random
 import itertools
+from datetime import datetime
 from collections import defaultdict, Counter
 
 import ipdb
@@ -15,6 +17,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 from nltk.tokenize import sent_tokenize
+from nltk import agreement
 from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
 
 from utils import write_data, write_jsonl, write_txt, \
@@ -24,9 +27,8 @@ from utils import write_data, write_jsonl, write_txt, \
 from eval_ppb_answers import evaluate, load_data, align_ans
 
 N_SAMPLES = 5
-ATTN_IDX = -2
+ATTN_IDXS = [-2, -3]
 MTURK_BAD_RESPONSES = ['[DISCONNECT]', '[RETURNED]']
-
 
 
 def get_qags_scores(src_ans_file, trg_ans_file, metric_name="em", n_qsts_per_doc=10):
@@ -64,6 +66,9 @@ def get_rouge_scores(hyps, refs):
     return rouge_scores
 
 
+def get_lens(txts):
+    """ """
+    return [len(txt.split()) for txt in txts]
 
 def extract_src_trg_gen_from_fseq_log():
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
@@ -87,6 +92,48 @@ def extract_src_trg_gen_from_fseq_log():
         out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
         write_txt(txts, out_file)
         print(f"Wrote {len(txts)} texts to {out_file}")
+
+
+def extract_subset():
+    """ Given a list of aligned files, extract a (random) subset """
+
+    n_exs = 5
+    min_len = 200
+    max_len = 400
+    curr_time = datetime.now()
+    sp2files = {
+            "src": ("data/xsum.test.src.all.txt", f"data/xsum.test.src.{curr_time.strftime('%m%d%H%M')}.random{n_exs}.txt"),
+            "trg": ("data/xsum.test.trg.all.txt", f"data/xsum.test.trg.{curr_time.strftime('%m%d%H%M')}.random{n_exs}.txt"),
+            "bart": ("data/xsum.test.bart.all.txt", f"data/xsum.test.bart.{curr_time.strftime('%m%d%H%M')}.random{n_exs}.txt"),
+             }
+
+    lens = {
+            "src": np.array(get_lens(load_txt(sp2files["src"][0]))),
+            "trg": np.array(get_lens(load_txt(sp2files["trg"][0]))),
+            "bart": np.array(get_lens(load_txt(sp2files["bart"][0]))),
+           }
+
+    # count # exs and get random subset
+    srcs = load_txt(sp2files["src"][0])
+    all_idxs = [i for i, s in enumerate(srcs) if len(s.split()) <= max_len and len(s.split()) >= min_len]
+    idxs = random.sample(all_idxs, n_exs)
+    print(f"\tSampled {n_exs} examples from {len(all_idxs)} considered")
+
+    for in_file, out_file in sp2files.values():
+        with open(in_file, encoding="utf-8") as in_fh:
+            all_data = in_fh.readlines()
+        out_data = [all_data[i] for i in idxs]
+        if "src" in in_file:
+            out_lens = np.array(get_lens(out_data))
+            print(f"Mean src len: {np.mean(out_lens)}")
+            print(f"Median src len: {np.median(out_lens)}")
+            print(f"Max src len: {np.max(out_lens)}")
+            print(f"Min src len: {np.min(out_lens)}")
+        with open(out_file, 'w', encoding="utf-8") as out_fh:
+            for out_datum in out_data:
+                out_fh.write(f"{out_datum}")
+
+    print(f"Done!")
 
 
 def aggregate_questions():
@@ -143,101 +190,14 @@ def aggregate_questions():
                 json.dump(data, open(out_file, "w", encoding="utf-8"))
 
 
-# Extract questions
-def extract_questions_and_write_jsonl():
-    #data_file = "/checkpoint/wangalexc/fairseq/06-18-2019/questions-cnndm.sampling.out"
-    #out_file = "/private/home/wangalexc/projects/qags/data/questions.sampling.jsonl"
-
-    #data_file = "/checkpoint/wangalexc/fairseq/06-27-2019/questions.cnndm-target.out"
-    #out_file = "/private/home/wangalexc/projects/qags/data/questions.cnndm-target.jsonl"
-    #aux_file = "/private/home/wangalexc/projects/qags/data/questions.cnndm-summaries.jsonl"
-    #swap_d = {"source": "target", "target": "source" } # will error as is
-
-    data_file = "/checkpoint/wangalexc/fairseq/07-09-2019/questions-cnndm-summaries-full.out"
-    out_file = "/private/home/wangalexc/projects/qags/data/questions.cnndm-summaries.jsonl"
-    #aux_file = "/private/home/wangalexc/projects/qags/data/questions.cnndm-targets.jsonl"
-    swap_d = {"source": "generation", "target": "source" }
-
-    data = parse_generation(data_file)
-    data = swap_fields(data, swap_d)
-    write_jsonl(data, out_file, swap_fields)
-    print_samples(data, n_samples=N_SAMPLES)
-    print(f"Extracted questions from {data_file} and wrote to {out_file}")
-
-
-def format_abstractive_qa():
-    """ Format an extractive QA task as a freeform QA task """
-
-    def _combine(x, y):
-        """ Combine two texts, x and y """
-        return f"{x} {y}"
-
-    def _format_qa_split(data):
-        """ """
-        srcs, trgs = [], []
-
-        for doc in data:
-            for psg_d in doc["paragraphs"]:
-                psg = psg_d["context"]
-                for qst_d in psg_d["qas"]:
-                    qst = qst_d["question"]
-                    src = _combine(qst, psg)
-                    srcs.append({"input": src})
-
-                    anss = [a["text"] for a in qst_d["answers"]]
-                    if len(anss) == 0: # question has no answer
-                        ans = "<na>"
-                    else:
-                        ans = anss[0]
-                    trgs.append({"target": ans})
-
-        return srcs, trgs
-
-    data_dir = "/private/home/wangalexc/data/squad/v2.0/original"
-    out_dir = "/private/home/wangalexc/data/squad/v2.0/abstractive"
-    split2file = {"train": "train.json",
-                  "dev": "dev.json"
-                  #"test": "test.json"
-                 }
-
-    for split_name, split_file in split2file.items():
-        data = load_json(os.path.join(data_dir, split_file))["data"]
-        srcs, trgs = _format_qa_split(data)
-        write_data(srcs=srcs, trgs=trgs, out_dir=out_dir, out_prefix=split_name, out_format="jsonl")
-
-
-def process_human_subset():
-
-    label_map = {'Incorrect': 0, 'Unclear': 0, 'Correct': 1}
-    txt_flds = ['src', 'trg', 'pgc', 'fan', 'bus']
-    data_file = "data/aligned-subsets.json"
-    data = json.load(open(data_file))
-
-    for txt_fld in txt_flds:
-        vals = list(data.values())
-        txts = [v[txt_fld] for v in vals]
-        if txt_fld in ['src', 'trg']:
-            txts = [" ".join(ex) for ex in txts]
-        else:
-            txts = [" ".join([s['text'] for s in ex['sents'].values()]) for ex in txts]
-            binary_scores = [label_map[v[txt_fld]['label']] for v in vals]
-            count_scores = [sum([label_map[s['label']] for s in ex[txt_fld]['sents'].values()]) / len(ex[txt_fld]['sents']) for ex in vals]
-        with open(f"data/labeled-subset/{txt_fld}-subset.txt", "w") as out_fh:
-            for txt in txts:
-                out_fh.write(f'{txt}\n')
-        if txt_fld not in ['src', 'trg']:
-            with open(f"data/labeled-subset/{txt_fld}-subset.scores.txt", "w") as out_fh:
-                out_fh.write("\n".join(map(str, count_scores)))
-            with open(f"data/labeled-subset/{txt_fld}-subset.binary-scores.txt", "w") as out_fh:
-                out_fh.write("\n".join(map(str, binary_scores)))
-
-
 JOIN_PUNCT = {'- lrb -': '-lrb-', '- rrb -': '-rrb-',
-              'n \'t': 'n\'t', '\' s': '\'s'
+              'n \' t ': 'n\'t ', '\' s ': '\'s ', ' \' ve ': '\'ve ',
+              ' \' m ': '\'m ', ' \' re ': ' \'re ', '\' d ': '\'d ',
+              ' \' ll ': ' \'ll '
              }
 REPLACE_PUNCT = {'-lrb-': '(', '-rrb-': ')', '-lsb-': '[', '-rsb-': ']', '#': '$'}
-NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m', '\'ve', '\'d', '?', '!', 'n\'t', '\'re']
-NO_TRAILING_SPACE_PUNCT = [' `', ' \'']
+NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m', '\'ve', '\'d', '?', '!', 'n\'t', '\'re', '\'']
+NO_TRAILING_SPACE_PUNCT = [' `']#, ' \'']
 
 
 def detokenize_sent(sent):
@@ -264,60 +224,126 @@ def align_summaries():
         and find nearest neighbors.
     """
 
-    def get_aligned_shortest(txts1, txts2, n_exs_to_search=1000):
+    def get_aligned_shortest(txts1, txts2, n_exs_to_search):
         """Get alignment in txt2 of the shortest n_exs summaries in txts1
         """
-        sorted_txts2 = sorted(enumerate(txts2), key=lambda x: len(x[1].split()))
+        lens1 = [len(t.split()) for t in txts1]
         cnts1 = [Counter(t.split()) for t in txts1]
-        cnts2 = [(i, Counter(t.split())) for i, t in sorted_txts2[:n_exs_to_search]]
+        sorted_txts2 = sorted(enumerate(txts2), key=lambda x: len(x[1].split()))
+        #cnts2 = [(i, Counter(t.split())) for i, t in sorted_txts2[:n_exs_to_search]]
 
-        diffs = [[(i2, sum((c1 & c2).values())) for i2, c2 in cnts2] for c1 in cnts1]
+        #diffs = [[(i2, sum((c1 & c2).values())) for i2, c2 in cnts2] for c1 in cnts1]
         idxs2 = list()
-        for diff in diffs:
-            idx2, _ = max(diff, key=lambda x: x[-1])
-            idxs2.append(idx2)
-
-        def print_algn(idx):
-            print(f"{idx}: {txts1[idx]}\n")
-            print(f"{alignment[idx]}: {txts2[alignment[idx]]}\n")
+        for len1, cnt1 in zip(lens1, cnts1):
+        #for diff in diffs:
+            cnts2 = [(i, Counter(t.split()[:len1])) for i, t in sorted_txts2[:n_exs_to_search]]
+            diff = [(i2, sum((cnt1 & c2).values())) for i2, c2 in cnts2]
+            new_idx2, (orig_idx2, cnt2) = max(enumerate(diff), key=lambda x: x[1][-1])
+            #idx2, cnt2 = max(diff, key=lambda x: x[-1])
+            idxs2.append(orig_idx2)
+            cnts2.pop(new_idx2)
 
         return idxs2
 
-    n_exs = 500
-    n_exs_to_search = 750
+    def get_aligned(txts1, txts2, idxs, search_width):
+        """Get alignment in txt2 in txts1
+        """
+        #sorted_txts2 = sorted(enumerate(txts2), key=lambda x: len(x[1].split()))
+        sorted_txts2 = sorted(enumerate(txts2), key=lambda x: x[1])
+        cnts1 = [Counter(t.split()) for t in txts1]
+        idxs2 = list()
+        for idx, cnt in zip(idxs, cnts1):
+            start_idx = max(0, idx - search_width)
+            end_idx = min(len(txts2), idx + search_width)
+            cnts2 = [(i, Counter(t.split())) for i, t in sorted_txts2[start_idx: end_idx]]
+            diffs = [(i2, sum((cnt & c2).values())) for i2, c2 in cnts2]
+            idx2, _ = max(diffs, key=lambda x: x[-1])
+            idxs2.append(idx2)
+        return idxs2
+
+    def proc(txts, proc_d):
+        """ """
+        new_txts = list()
+        for txt in txts:
+            for k, v in proc_d.items():
+                txt = txt.replace(k ,v)
+            new_txts.append(txt)
+        return new_txts
+
+    n_exs = 100
+    search_width = 100
+    shortest = 0 # if 0, random
+
+    mdl_files = {
+                 "bus": ("data/all_bus/all_bus.trg.txt", "data/all_bus/all_bus.src.400words.txt",
+                     {'-': ' - ', '`': ' ` ', '\'': ' \' ', '.': ' . ', '': ''}),
+                 "fas": ("data/all_fas/all_fas_rerank.trg.v2.txt", "/misc/vlgscratch4/BowmanGroup/awang/raw_data/cnndm_harvard/test.txt.src",
+                         {'-': ' - ', '`': ' ` ', '\'': ' \' ', '.': ' . '}),
+                 "pgc": ("data/all_pgc/all_pgc.trg.txt", "data/all_pgc/all_pgc.src.txt",
+                         {'(': '- lrb -', ')': '- rrb -', '`': ' ` ', '\'': ' \' ', ',': ' , '}),
+                }
 
     ref_src_file = "/misc/vlgscratch4/BowmanGroup/awang/processed_data/cnndailymail/fseq/src.cnndm.test.txt"
     ref_trg_file = "/misc/vlgscratch4/BowmanGroup/awang/processed_data/cnndailymail/fseq/trg.cnndm.test.txt"
     # Load the sources that we'll use
-    ref_srcs = load_txt(ref_src_file)
-    ref_trgs = load_txt(ref_trg_file)
-    sorted_ref_srcs_and_idxs = sorted(enumerate(ref_srcs), key=lambda x: len(x[1].split()))
-    sorted_ref_idxs, sorted_ref_srcs = zip(*sorted_ref_srcs_and_idxs[:n_exs])
-    sorted_ref_trgs = [ref_trgs[i] for i in sorted_ref_idxs]
-    write_txt(sorted_ref_srcs, f"data/subset{n_exs}.src.txt")
-    write_txt(sorted_ref_trgs, f"data/subset{n_exs}.trg.txt")
+    orig_preproc_d = {} #{'- lrb -': '-lrb-', '- rrb -': '-rrb-'}
+    all_ref_srcs = proc(load_txt(ref_src_file), orig_preproc_d)
+    all_ref_trgs = proc(load_txt(ref_trg_file), orig_preproc_d)
+    #all_sorted_ref_srcs_and_idxs = sorted(enumerate(all_ref_srcs), key=lambda x: len(x[1].split()))
+    all_sorted_ref_srcs_and_idxs = sorted(enumerate(all_ref_srcs), key=lambda x: x[1])
+    all_sorted_ref_idxs, all_sorted_ref_srcs = zip(*all_sorted_ref_srcs_and_idxs)
+    all_sorted_ref_trgs = [all_ref_trgs[i] for i in all_sorted_ref_idxs]
+    all_sorted_ref_lens = [len(s.split()) for s in all_sorted_ref_srcs]
+    min_ref_src_len = min(all_sorted_ref_lens)
 
-    mdl_files = {
-                 "bus": ("data/all_bus/all_bus.trg.txt", "data/all_bus/all_bus.src.400words.txt"),
-                 "fas": ("data/all_fas/all_fas_rerank.trg.txt", "/misc/vlgscratch4/BowmanGroup/awang/raw_data/cnndm_harvard/test.txt.src"),
-                 "pgc": ("data/all_pgc/all_pgc.trg.txt", "data/all_pgc/all_pgc.src.txt"),
-                }
+    if shortest:
+        ref_srcs = all_sorted_ref_srcs[:n_exs]
+        ref_trgs = all_sorted_ref_trgs[:n_exs]
+        write_txt(ref_srcs, f"data/subset{n_exs}.shortest.src.txt")
+        write_txt(ref_trgs, f"data/subset{n_exs}.shortest.trg.txt")
+    else:
+        #rand_idxs = random.sample(range(int(len(all_sorted_ref_srcs) / 2)), n_exs)
+        rand_idxs = random.sample(range(len(all_sorted_ref_srcs)), n_exs)
+        ref_srcs = [all_sorted_ref_srcs[i] for i in rand_idxs]
+        ref_trgs = [all_sorted_ref_trgs[i] for i in rand_idxs]
+        write_txt(ref_srcs, f"data/subset{n_exs}.random.src.txt")
+        write_txt(ref_trgs, f"data/subset{n_exs}.random.trg.txt")
+        print(f"idxs: {rand_idxs}")
+    ref_lens = np.array([len(s.split()) for s in ref_srcs])
 
-    for mdl_name, (mdl_gen_file, mdl_ref_file) in mdl_files.items():
+    for mdl_name, (mdl_gen_file, mdl_ref_file, mdl_preproc_d) in mdl_files.items():
         print(f"Processing data for {mdl_name}")
         mdl_gens = load_txt(mdl_gen_file)
-        mdl_refs = load_txt(mdl_ref_file)
+        mdl_refs = proc(load_txt(mdl_ref_file), mdl_preproc_d)
         print("\tFinished loading data")
 
         # maps from ref order idx to mdl order idx
+        start_time = time.time()
         if "src" in mdl_ref_file: # compare against sources
-            mdl_idxs = get_aligned_shortest(sorted_ref_srcs, mdl_refs, n_exs_to_search)
+            if shortest:
+                mdl_idxs = get_aligned_shortest(ref_srcs, mdl_refs,
+                                                n_exs_to_search=n_exs + search_width)
+            else:
+                mdl_idxs = get_aligned(ref_srcs, mdl_refs, rand_idxs, search_width)
         else: # compare against gold targets / references
             assert "ref" in mdl_ref_file
-            mdl_idxs = get_aligned_shortest(sorted_ref_trgs, mdl_refs, n_exs_to_search)
-        print("\tFinished aligning data")
+            if shortest:
+                mdl_idxs = get_aligned_shortest(ref_trgs, mdl_refs, n_exs_to_search=n_exs + search_width)
+            else:
+                mdl_idxs = get_aligned(ref_trgs, mdl_refs, rand_idxs, search_width)
         subset_mdl_gens = [mdl_gens[i] for i in mdl_idxs]
-        write_txt(subset_mdl_gens, f"data/subset{n_exs}.{mdl_name}.trg.ref_order.txt")
+        subset_mdl_lens = np.array([len(s.split()) for s in subset_mdl_gens])
+        #print(f"mdl idxs: {mdl_idxs}")
+        print(f"\tFinished aligning {n_exs} examples in {time.time() - start_time}s")
+        print(f"\tMean src length: {np.mean(ref_lens)}")
+        print(f"\tMax src length: {np.max(ref_lens)}")
+        print(f"\tMean gen length: {np.mean(subset_mdl_lens)}")
+        print(f"\tMax gen length: {np.max(subset_mdl_lens)}")
+
+        if shortest:
+            write_txt(subset_mdl_gens, f"data/subset{n_exs}.{mdl_name}.shortest.ref_order.txt")
+        else:
+            write_txt(subset_mdl_gens, f"data/subset{n_exs}.{mdl_name}.random.ref_order.txt")
         print("\tFinished writing data")
 
     return
@@ -328,18 +354,76 @@ def prepare_parlai_data():
 
     # load original articles
     mdl_files = {
-                 #'src': 'data/subset-src.txt',
-                 #'bus': 'data/subset-bus.txt',
-                 #'fas': 'data/subset-fas.txt',
-                 #'pgc': 'data/subset-pgc.txt',
-                 #'trg': 'data/subset-trg.txt'
 
-                 'src': 'data/subset500.src.txt',
-                 'trg': 'data/subset500.trg.txt',
-                 'bus': 'data/subset500.bus.trg.ref_order.txt',
-                 'fas': 'data/subset500.fas.trg.ref_order.txt',
-                 'pgc': 'data/subset500.pgc.trg.ref_order.txt',
+                # labelled subset from Falke et al., 2019
+                (100, 'subset'): {
+                     'src': 'data/subset-src.txt',
+                     'bus': 'data/subset-bus.txt',
+                     'fas': 'data/subset-fas.txt',
+                     'pgc': 'data/subset-pgc.txt',
+                     'trg': 'data/subset-trg.txt'
+                 },
+
+                 # 500 shortest examples
+                 (500, 'shortest'): {
+                     'src': 'data/subset500.src.txt',
+                     'trg': 'data/subset500.trg.txt',
+                     'bus': 'data/subset500.bus.trg.ref_order.txt',
+                     'fas': 'data/subset500.fas.trg.ref_order.txt',
+                     'pgc': 'data/subset500.pgc.trg.ref_order.txt',
+                 },
+
+                 # random 1000 examples
+                 (1000, 'random'): {
+                     'src': 'data/subset1000.random.src.txt',
+                     'trg': 'data/subset1000.random.trg.txt',
+                     'bus': 'data/subset1000.bus.random.ref_order.txt',
+                     'fas': 'data/subset1000.fas.random.ref_order.txt',
+                     'pgc': 'data/subset1000.pgc.random.ref_order.txt',
+                 },
+
+                 # random 100 examples
+                 (100, 'random'): {
+                     'src': 'data/subset100.random.src.txt',
+                     'trg': 'data/subset100.random.trg.txt',
+                     'bus': 'data/subset100.bus.random.ref_order.txt',
+                     'fas': 'data/subset100.fas.random.ref_order.txt',
+                     'pgc': 'data/subset100.pgc.random.ref_order.txt',
+                 },
+
+                 (5, 'xsum-random'): {
+                     'src': 'data/xsum.test.src.10301218.random5.txt',
+                     'trg': 'data/xsum.test.trg.10301218.random5.txt',
+                     'bart': 'data/xsum.test.bart.10301218.random5.txt',
+                 },
+
+                 (10, 'xsum-random'): {
+                     'src': 'data/xsum.test.src.10231603.random10.txt',
+                     'trg': 'data/xsum.test.trg.10231603.random10.txt',
+                     'bart': 'data/xsum.test.bart.10231603.random10.txt',
+                 },
+
+                 (100, 'xsum-random'): {
+                     'src': 'data/xsum.test.src.10251018.random100.txt',
+                     'trg': 'data/xsum.test.trg.10251018.random100.txt',
+                     'bart': 'data/xsum.test.bart.10251018.random100.txt',
+
+                 },
+
+                 (1000, 'xsum-random'): {
+                     'src': 'data/xsum.test.src.10251125.random1000.txt',
+                     'trg': 'data/xsum.test.trg.10251125.random1000.txt',
+                     'bart': 'data/xsum.test.bart.10251125.random1000.txt',
+                 },
                 }
+
+    n_shards = 20
+    n_exs = 1000
+    dataset = 'xsum'
+    subset_key = (n_exs, f'{dataset}-random')
+    should_add_attn_task = 1
+    should_filter_length = 0
+    mdl_files = mdl_files[subset_key]
 
     raw_srcs = [s.strip() for s in open(mdl_files['src'], encoding="utf-8")]
     srcs = []
@@ -347,11 +431,12 @@ def prepare_parlai_data():
         for k, v in JOIN_PUNCT.items():
             src = src.replace(k, v)
         srcs.append(src)
-    srcs_sents = [[detokenize_sent(s) for s in sent_tokenize(src)] for src in srcs]
+    if dataset == 'xsum':
+        #srcs_sents = [sent_tokenize(src) for src in srcs]
+        srcs_sents = [[detokenize_sent(s) for s in sent_tokenize(src)] for src in srcs]
+    elif dataset == 'cnndm':
+        srcs_sents = [[detokenize_sent(s) for s in sent_tokenize(src)] for src in srcs]
 
-    n_shards = 5
-    should_add_attn_task = 1
-    should_filter_length = 0
     if should_filter_length:
         #lens = np.array([len(s.split()) for s in srcs])
         lens = np.array([len(s) for s in srcs])
@@ -379,7 +464,10 @@ def prepare_parlai_data():
             gen = gens[src_idx]
             par_sents = []
 
-            gen_sents = [detokenize_sent(s) for s in sent_tokenize(gen)]
+            if dataset == 'xsum' and mdl_name != 'src':
+                gen_sents = [detokenize_sent(gen)]
+            else:
+                gen_sents = [detokenize_sent(s) for s in sent_tokenize(gen)]
             for sent_idx, sent in enumerate(gen_sents):
                 gen_d = {'dialog': [{'speaker': 'model', 'text': sent}],
                          'ex_idx': (mdl_name, src_idx, sent_idx),
@@ -388,24 +476,44 @@ def prepare_parlai_data():
                 par_sents.append(gen_d)
 
             if should_add_attn_task:
-                use_negative = bool(random.random() > 0.5)
-                if use_negative:
-                    # negative attn task
+                # negative attn task
+                if dataset == 'xsum':
+                    sents = random.sample(src_sents, 2)
+                    words1 = sents[0].split()
+                    words2 = sents[1].split()
+                    sent = []
+                    for i in range(max(len(words1), len(words2))):
+                        if (((i // 2) % 2 == 0) and not (i >= len(words1))) or \
+                            (i >= len(words2)):
+                            sent.append(words1[i])
+                        else:
+                            sent.append(words2[i])
+                    sent = ' '.join(sent).lower().capitalize()
+                    #sent = ' '.join(words1[:2] + words2[2:]).lower().capitalize()
+                else:
                     sent = random.choice(gen_sents).split()
                     random.shuffle(sent)
                     sent = ' '.join(sent).lower().capitalize()
-                else:
-                    # positive attn task
-                    #sent = src_sents[min(len(src_sents), -2)]
-                    sent = src_sents[min(len(src_sents), 1)]
 
                 sent_idx = -2
                 gen_d = {'dialog': [{'speaker': 'model', 'text': sent}],
                          'ex_idx': (mdl_name, src_idx, sent_idx),
                          'para_idx': sent_idx,
-                         'answer': 'no' if use_negative else 'yes'
+                         'answer': 'no'
                         }
                 par_sents.append(gen_d)
+
+                # positive attn task
+                pos_idx = 1 if dataset == 'xsum' else 1
+                sent = src_sents[min(len(src_sents), pos_idx)]
+                sent_idx = -3
+                gen_d = {'dialog': [{'speaker': 'model', 'text': sent}],
+                         'ex_idx': (mdl_name, src_idx, sent_idx),
+                         'para_idx': sent_idx,
+                         'answer': 'yes'
+                        }
+                par_sents.append(gen_d)
+
 
             para_d = {
                       'dialog': [{'speaker': 'model', 'text': ' '.join(gen_sents)}],
@@ -418,14 +526,14 @@ def prepare_parlai_data():
 
         n_exs_per_shard = len(para_data) // n_shards
         for shard_n in range(n_shards):
-            para_file = f"data/mturk/summary/{mdl_name}_para_nex500_ref_order_shard{shard_n}.jsonl"
+            para_file = f"data/mturk/{dataset}/{mdl_name}_para_nex{n_exs}_randorder_shard{shard_n}.jsonl"
             with open(para_file, 'w', encoding='utf-8') as para_fh:
                 data_slice = para_data[shard_n * n_exs_per_shard : (shard_n + 1) * n_exs_per_shard]
                 for para_d in data_slice:
                     para_fh.write(f"{json.dumps(para_d)}\n")
 
             # write to jsonl
-            sent_file = f"data/mturk/summary/{mdl_name}_sent_nex500_ref_order_shard{shard_n}.jsonl"
+            sent_file = f"data/mturk/{dataset}/{mdl_name}_sent_nex{n_exs}_randorder_shard{shard_n}.jsonl"
             with open(sent_file, 'w', encoding='utf-8') as sent_fh:
                 data_slice = sent_data[shard_n * n_exs_per_shard : (shard_n + 1) * n_exs_per_shard]
                 for sents_d in data_slice:
@@ -434,24 +542,31 @@ def prepare_parlai_data():
 
 
 
-def evaluate_parlai_mturk(data_files, mdl):
-    """ Do basic data analysis on mturk data (run through ParlAI)
-    data_file should be jsonl
+def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
+                                    qags_src_file, qags_trg_file, n_qsts_per_doc):
+    """ Compute sentence and system level correlations
+    between human annotations and ROUGE scores
     """
 
-    idx2responses = defaultdict(lambda: defaultdict(list))
-    idx2data = dict()
-    worker2responses = defaultdict(list)
-    response_map = {'1': 'yes', '2': 'no'}
-    n_resps = 0
+    # 1 is YES, 2 is NO
+    resp_map = {'1': 1, '2': 0}
 
-    for data_file in data_files:
-        data = [ast.literal_eval(l) for l in open(data_file, encoding="utf-8")]
-        for datum in data:
+    # Load mturk data
+    n_hits, n_desk_rejects, n_total = 0, 0, 0
+    idxs = list()
+    idx2responses = defaultdict(lambda: defaultdict(list))
+    for turk_file in turk_files:
+        mturk_data = [ast.literal_eval(l) for l in open(turk_file, encoding="utf-8")]
+        for datum in mturk_data:
             for worker_id, worker in datum['worker_data'].items():
-                if worker['response']['text'] in MTURK_BAD_RESPONSES:
-                    continue
+
+                n_total += 1
+                # Filter out bad reponses
                 short_msg_flag, attn_fail_flag = 0, 0
+                ## filter out returns and discounnects
+                if worker['response']['text'] in MTURK_BAD_RESPONSES:
+                    n_desk_rejects += 1
+                    continue
                 ## filter out short responses
                 for response in worker['response']['task_data']:
                     if not response.get('textReason', ''):
@@ -461,63 +576,22 @@ def evaluate_parlai_mturk(data_files, mdl):
                     if task['conversations'][1].get('answer', None) is not None:
                         choice = int(worker['response']['task_data'][task_idx]['speakerChoice'])
                         expected = 1 if task['conversations'][1]['answer'] == 'yes' else 2
-                        attn_fail_flag = bool(choice != expected)
+                        if choice != expected:
+                            attn_fail_flag = True
+                # filter out too short time ?
                 if short_msg_flag or attn_fail_flag:
                     continue
 
-                # bookkeeping
-                n_resps += 1
-                worker2responses[worker_id].append(worker)
-
-                para_idx = tuple(worker['task_data'][0]['conversations'][0]['ex_idx'])
-                idx2data[para_idx] = worker['task_data'][0]['conversations'][0]['dialog'][0]['text']
-
-                sent_idxs = []
-                for task in worker['task_data']:
-                    sent_idx = tuple(task['conversations'][1]['ex_idx'])
-                    sent_idxs.append(sent_idx)
-                    idx2data[sent_idx] = task['conversations'][1]['dialog'][0]['text']
-
+                n_hits += 1
+                para_idx = tuple(worker['task_data'][0]['conversations'][0]['ex_idx'])[1]
+                sent_idxs = [t['conversations'][1]['ex_idx'][2] for t in worker['task_data']]
                 resps = [d["speakerChoice"] for d in worker['response']['task_data']]
-
                 for sent_idx, resp in zip(sent_idxs, resps):
-                    idx2responses[para_idx][sent_idx].append(resp)
+                    idx2responses[para_idx][sent_idx].append(resp_map[resp])
+                idxs.append(para_idx)
 
+    idxs = list(set(idxs))
 
-    def print_ids():
-        n_hits, n_tasks = 0, 0
-        n_yes, n_no = 0, 0
-        n_all_yes, n_all_no = 0, 0
-        multiresponse_idxs = []
-        all_no_idxs = []
-        resps3_idxs = []
-        for k, v in idx2responses.items():
-            n_responses = max(len(vv) for vv in v.values())
-            if n_responses == 3:
-                resps3_idxs.append(k)
-            resps = [1 if vv[0] == '1' else 0 for vv in v.values()]
-            n_all_yes += int(sum(resps) == len(v))
-            n_all_no += int(sum(resps) == 0)
-            n_yes += sum(resps)
-            n_no += len(v) - sum(resps)
-            n_tasks += len(v)
-            n_hits += n_responses
-
-            if n_responses > 1:
-                multiresponse_idxs.append(k)
-            if not sum(resps):
-                all_no_idxs.append(k)
-            print(f"{k[1]}: {n_responses} responses")
-
-        print(f"loaded data from {n_hits} hits for {mdl}")
-        print(f"# examples w/ >1 responses: {len(multiresponse_idxs)}")
-        print(f"# examples w/ >3 responses: {len(resps3_idxs)}")
-        print(f"\tids: {multiresponse_idxs}")
-
-        assert n_tasks == (n_yes + n_no)
-        print(f"\tn yes: {n_yes}, n no: {n_no}, n all yes {n_all_yes}, n all no: {n_all_no}")
-        print(f"\tall no idxs: {all_no_idxs}")
-        return resps3_idxs
 
     def print_response(par_idx):
         src_key = ('src', par_idx, -1)
@@ -529,102 +603,101 @@ def evaluate_parlai_mturk(data_files, mdl):
             #trg_key = (mdl, par_idx, i)
             print(f"\t{idx2responses[src_key][trg_key]}: {idx2data[trg_key]}")
 
-    resps3_idxs = print_ids()
-    ipdb.set_trace()
-
-
-
-def compute_correctness_judgments_rouge_correlations(turk_files, hyp_file, mdl, ref_file='data/subset-trg.txt'):
-    """ Compute sentence and system level correlations
-    between human annotations and ROUGE scores
-    """
-
-    # 1 is YES, 2 is NO
-    resp_map = {'1': 1, '2': 0}
-
-    # Load mturk data
-    n_hits = 0
-    idxs = []
-    idx2responses = defaultdict(lambda: defaultdict(list))
-    for turk_file in turk_files:
-        mturk_data = [ast.literal_eval(l) for l in open(turk_file, encoding="utf-8")]
-        for datum in mturk_data:
-            for worker_id, worker in datum['worker_data'].items():
-
-                # Filter out bad reponses
-                ## filter out returns and discounnects
-                if worker['response']['text'] in MTURK_BAD_RESPONSES:
-                    continue
-                short_msg_flag, attn_fail_flag = 0, 0
-                ## filter out short responses
-                for response in worker['response']['task_data']:
-                    if not response.get('textReason', ''):
-                        short_msg_flag = True
-                ## filter out attn check fails
-                for task_idx, task in enumerate(worker['task_data']):
-                    if task['conversations'][1].get('answer', None) is not None:
-                        choice = int(worker['response']['task_data'][task_idx]['speakerChoice'])
-                        expected = 1 if task['conversations'][1]['answer'] == 'yes' else 2
-                        attn_fail_flag = bool(choice != expected)
-                if short_msg_flag or attn_fail_flag:
-                    continue
-                n_hits += 1
-
-                para_idx = tuple(worker['task_data'][0]['conversations'][0]['ex_idx'])[1]
-                idxs.append(para_idx)
-                sent_idxs = [t['conversations'][1]['ex_idx'][2] for t in worker['task_data']]
-                resps = [d["speakerChoice"] for d in worker['response']['task_data']]
-                for sent_idx, resp in zip(sent_idxs, resps):
-                    idx2responses[para_idx][sent_idx].append(resp)
-    idxs = list(set(idxs))
 
     # Aggregate stuff
-    n_tasks = 0
-    human_scores = list()
-    odd_human_scores = list()
-    odd_idxs = list()
-    disagreement_idxs = list()
-    equal_idxs = list()
+    n_tasks = 0 # n article-sentence pairs
+    n_yes, n_no = 0, 0 # n aggregate yes/no among article-sentence pairs
+    n_all_votes_yes, n_all_votes_no = 0, 0 # n tasks where all voted yes/no
+    n_all_responses_yes, n_all_responses_no = 0, 0 # n articles where all tasks are yes/no
+    human_scores = list() # scores per summary, averaged over sentences
+    odd_human_scores = list() # scores for summaries w/ 3 annotations
+    odd_idxs = list() # idxs of summaries w/ 3 annotations
+    n_responses = defaultdict(int) # n tasks w/ {1,2,3} responses
+    odd_kappas = defaultdict(lambda: defaultdict(list))
     for para_idx in idxs:
         para_d = idx2responses[para_idx]
         agg_labels = []
         odd_agg_labels = []
+        n_par_tasks, n_par_yes = 0, 0
         for sent_idx, votes in para_d.items():
-            if sent_idx == ATTN_IDX:
+            if sent_idx in ATTN_IDXS:
                 continue
-            votes = [resp_map[v] for v in votes]
+            assert votes, "No votes!"
             votes0 = votes.count(0)
             votes1 = votes.count(1)
-            agg_labels.append(1 if votes1 >= votes0 else 0)
-            if votes0 > 0 and votes1 > 0:
-                disagreement_idxs.append((para_idx, sent_idx))
-            if votes0 == votes1:
-                equal_idxs.append((para_idx, sent_idx))
-            if len(votes) % 2 == 1:
+            if votes1 >= votes0:
+                agg_labels.append(1)
+                n_yes += 1
+                n_par_yes += 1
+            else:
+                agg_labels.append(0)
+                n_no += 1
+            n_responses[votes0 + votes1] += 1
+
+            # sentence level bookkeeping
+            if votes1 == len(votes):
+                n_all_votes_yes += 1
+            if votes0 == len(votes):
+                n_all_votes_no += 1
+            if len(votes) % 2 == 1 and len(votes) > 1:
                 odd_agg_labels.append(1 if votes1 > votes0 else 0)
                 if para_idx not in odd_idxs:
                     odd_idxs.append(para_idx)
+                odd_kappas[para_idx][sent_idx] = votes
             n_tasks += 1
+            n_par_tasks += 1
 
+        # article level bookkeeping
         human_scores.append(sum(agg_labels) / len(agg_labels))
         if odd_agg_labels:
             odd_human_scores.append(sum(odd_agg_labels) / len(odd_agg_labels))
+        if n_par_yes == n_par_tasks: # attn task
+            n_all_responses_yes += 1
+        if n_par_yes == 0:
+            n_all_responses_no += 1
 
-    print(f"Loaded data from {len(idxs)} examples, {n_hits} tasks")
-    print(f"\t{len(odd_human_scores)} / {len(human_scores)} examples with odd number of labels")
-    print(f"\t{len(disagreement_idxs)} / {n_tasks} tasks with disagreement")
+    print(f"Loaded data from {len(idxs)} articles, {n_tasks} tasks, {n_hits} HITS")
+    print(f"\tn desk reject {n_desk_rejects}, n total HITS {n_total}")
+    print(f"\tn_yes responses {n_yes}; n_no responses {n_no}")
+    print(f"\tn tasks all responses yes {n_all_votes_yes}; no {n_all_votes_no}; n_disagreement {n_tasks - n_all_votes_yes - n_all_votes_no}")
+    print(f"\t{len(odd_human_scores)} / {len(human_scores)} ({100 * len(odd_human_scores)/len(human_scores):.2f}%) articles with odd number of labels")
+    print(f"\t{n_all_responses_yes} / {len(idxs)} ({100 * n_all_responses_yes / len(idxs):.2f}%) articles where all tasks are yes")
+    print(f"\t{n_all_responses_no} / {len(idxs)} ({100 * n_all_responses_no / len(idxs):.2f}%) articles where all tasks are no")
+    #print(f"\t{', '.join([str(k) + ':' + str(v) for k, v in n_responses.items()])}")
+    for k, v in n_responses.items():
+        print(f"\t{v} tasks with {k} responses")
     print()
+
+
+    def compute_fleiss(resps):
+        """ Janky because we don't really have three annotators """
+        M = []
+        for par_idx, sents in resps.items():
+            for sent_idx, r in sents.items():
+                if sent_idx in ATTN_IDXS:
+                    continue
+                votes = [0] * 2
+                votes[0] = r.count(0)
+                votes[1] = r.count(1)
+                M.append(votes)
+        M = np.array(M)
+        N, k = M.shape  # N is # of items, k is # of categories
+        n_annotators = float(np.sum(M[0, :]))  # # of annotators
+        p = np.sum(M, axis=0) / (N * n_annotators) # prob of being rated 0, 1
+        P = (np.sum(M * M, axis=1) - n_annotators) / (n_annotators * (n_annotators - 1))
+        Pbar = np.sum(P) / N
+        PbarE = np.sum(p * p)
+
+        kappa = (Pbar - PbarE) / (1 - PbarE)
+        print(f"Fleiss: {kappa}, n annotators {n_annotators}")
 
     def compute_rouge_correlation(idxs, scores):
         """Compute ROUGE correlation with some scores
         """
         all_hyps = [l.strip() for l in open(hyp_file, encoding='utf-8')]
         all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
-        #refs = [all_refs[idx] for idx in idxs]
-        #hyps = [all_hyps[idx] for idx in idxs]
-        refs = [all_refs[idx % len(all_refs)] for idx in idxs]
-        hyps = [all_hyps[idx % len(all_hyps)] for idx in idxs]
-
+        refs = [all_refs[idx] for idx in idxs]
+        hyps = [all_hyps[idx] for idx in idxs]
         rouge_scores = get_rouge_scores(hyps, refs)
         pearson_corr = pearsonr(scores, rouge_scores)
         spearman_corr = spearmanr(scores, rouge_scores)
@@ -635,12 +708,10 @@ def compute_correctness_judgments_rouge_correlations(turk_files, hyp_file, mdl, 
         """Compute QAGS correlation with some scores
         """
 
-        n_qsts_per_doc = 10
-        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
-        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
-        all_qags_scores = get_qags_scores(qags_src_file, qags_trg_file, metric_name)
-        #qags_scores = [all_qags_scores[idx] for idx in idxs]
-        qags_scores = [all_qags_scores[idx % len(all_qags_scores)] for idx in idxs]
+        all_qags_scores = get_qags_scores(qags_src_file, qags_trg_file,
+                                          metric_name=metric_name,
+                                          n_qsts_per_doc=n_qsts_per_doc)
+        qags_scores = [all_qags_scores[idx] for idx in idxs]
         pearson_corr = pearsonr(scores, qags_scores)
         spearman_corr = spearmanr(scores, qags_scores)
         print(f"pearson correlation w/ QAGS {metric_name}: {pearson_corr}")
@@ -651,94 +722,14 @@ def compute_correctness_judgments_rouge_correlations(turk_files, hyp_file, mdl, 
     compute_rouge_correlation(idxs, human_scores)
     compute_qags_correlation(idxs, human_scores, metric_name="em")
     compute_qags_correlation(idxs, human_scores, metric_name="f1")
+    compute_fleiss(idx2responses)
     print()
 
-    print(f"Examples with odd # labels")
+    print(f"Examples with odd # labels ({len(odd_idxs)})")
     compute_rouge_correlation(odd_idxs, odd_human_scores)
     compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="em")
     compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="f1")
-
-
-
-def compute_pair_judgments_rouge_correlations():
-    """ Compute sentence and system level correlations
-    between human annotations and ROUGE scores
-    """
-
-    model = "bus"
-
-    data_file = "data/mturk_summary_pair.csv"
-    all_data = pd.read_csv(data_file)
-
-    ref_file = 'data/subset-trg.txt'
-    all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
-    refs = []
-    hyps = []
-    choices = []
-    for idx, row in all_data.iterrows():
-        refs.append(all_refs[row['Input.idx']])
-        refs.append(all_refs[row['Input.idx']])
-        hyps.append(row['Input.summary1'])
-        hyps.append(row['Input.summary2'])
-        if row['Answer.choice.summary1']:
-            choices.append(1)
-        elif row['Answer.choice.summary2']:
-            choices.append(2)
-        elif row['Answer.choice.about-equal']:
-            choices.append(3)
-        else: # 'Answer.choice.cant-tell'
-            choices.append(4)
-
-    assert len(refs) == len(hyps)
-
-    rouge_eval = rouge.Rouge(metrics=['rouge-n', 'rouge-l'],
-                             max_n=4,
-                             limit_length=True,
-                             length_limit=100,
-                             length_limit_type='words',
-                             apply_avg=False,
-                             apply_best=False,
-                             alpha=0.5,
-                             weight_factor=1.2,
-                             stemming=True)
-
-    rouge_scores = rouge_eval.get_scores(hyps, refs)
-    def score(score_d, idx):
-        total_score = 0.
-        n_metrics = len(score_d)
-        for metric_name, metric_d in score_d.items():
-            total_score += metric_d[idx]['f'][0]
-        return total_score / n_metrics
-
-
-    n_agree = 0
-    n_canttell = 0
-    rouge_choices = []
-    scores1, scores2 = [], []
-    for i in range(int(len(refs) / 2)):
-        score1 = score(rouge_scores, 2*i)
-        score2 = score(rouge_scores, 2*i + 1)
-        scores1.append(score1)
-        scores2.append(score2)
-
-        if (abs(score1 - score2) < 0.01):
-            rouge_choices.append(3)
-        elif score1 > score2:
-            rouge_choices.append(1)
-        elif score1 < score2:
-            rouge_choices.append(2)
-
-        if (abs(score1 - score2) < 0.01 and choices[i] == 3) or \
-           (score1 > score2 and choices[i] == 1) or \
-           (score1 < score2 and choices[i] == 2):
-            n_agree += 1
-        if choices[i] == 4:
-            n_canttell += 1
-
-    print(f"ROUGE and human eval agree {n_agree}/{len(choices)} ({n_agree / len(choices)} %)")
-    print(f"\t# cant tell (human): {n_canttell}")
-
-    ipdb.set_trace()
+    compute_fleiss(odd_kappas)
 
 
 
@@ -772,72 +763,115 @@ def mturk_posthoc(is_sandbox=False):
 
 
 
-def mturk_review_hits(is_sandbox=False):
-    """Currently: analyze time
-    """
-    data_handler = MTurkDataHandler(file_name='pmt_sbdata.db' if is_sandbox else 'pmt_data.db')
-    worker_hit_pairs = [l.strip().split(',') for l in open("workers_to_check.txt", encoding="utf-8")][1:]
 
-    for worker_id, hit_id in worker_hit_pairs:
-        ipdb.set_trace()
-        asgs = data_handler.get_assignments_for_run(run['run_id'])
-        for asg in asgs:
-            asg_data = data_handler.get_worker_assignment_pairing(asg['worker_id'], asg['assignment_id'])
-            if asg_data['status'] in ['disconnect']:
-                continue
-            if asg_data['task_end'] is None or asg_data['task_start'] is None:
-                continue
-            statuses.append(asg_data['status'])
-            times.append(asg_data['task_end'] - asg_data['task_start'])
-
-
-
-mdl2turk_data = {
-    #"bus": ["data/mturk/summary/precision/mturk_data.09271534.jsonl",
-    #        "data/mturk/summary/precision/mturk_data.10041456.jsonl",
-    #        "data/mturk/summary/precision/mturk_data.10071418.jsonl"],
-    "bus": ["data/mturk/summary/precision/mturk_data.10111337.jsonl",
-            # NOTE(Alex): 10/14 10:59 didn't use HIT requirements
-            "data/mturk/summary/precision/mturk_data.10141059.jsonl",
-            # NOTE(Alex): contains 2x annotations / task
-            "data/mturk/summary/precision/mturk_data.101412XX.jsonl",
-           ],
+subset100_data = {
+    "bus": ["data/mturk/summary/precision/mturk_data.09271534.jsonl",
+            "data/mturk/summary/precision/mturk_data.10041456.jsonl",
+            "data/mturk/summary/precision/mturk_data.10071418.jsonl"],
 
     "trg": ["data/mturk/summary/precision/mturk_data.09271635.jsonl"],
 
-    #"pgc": "data/mturk/summary/precision/mturk_data.09271736.jsonl",
-    #"pgc": "data/mturk/summary/precision/mturk_data.10021638.jsonl",
-    #"pgc": "data/mturk/summary/precision/mturk_data.10031605.jsonl",
     "pgc": [
             "data/mturk/summary/precision/mturk_data.09271736.jsonl",
             "data/mturk/summary/precision/mturk_data.10021638.jsonl",
             "data/mturk/summary/precision/mturk_data.10031605.jsonl"
            ],
 
-    #"fas": ["data/mturk/summary/precision/mturk_data.10011138.jsonl"]
-    #"fas": "data/mturk/summary/precision/mturk_data.10021758.jsonl"
     "fas": ["data/mturk/summary/precision/mturk_data.10011138.jsonl",
             "data/mturk/summary/precision/mturk_data.10021758.jsonl",
             "data/mturk/summary/precision/mturk_data.10071607.jsonl",
-           ]
+           ],
+
+    "hyp": {mdl: f"data/subset-{mdl}.txt" for mdl in ["bus", "pgc", "fas"]},
+    "ref": "data/subset-trg.txt",
+    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
+    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
+
 }
+
+subset500_data = {
+    "bus": [
+            "data/mturk/summary/precision/mturk_data.10111337.jsonl",
+            # NOTE(Alex): 10/14 10:59 didn't use HIT requirements
+            #"data/mturk/summary/precision/mturk_data.10141059.jsonl",
+            # NOTE(Alex): contains 2x annotations / task
+            "data/mturk/summary/precision/mturk_data.10141206.jsonl",
+           ],
+
+    "pgc": [
+           ],
+
+    "fas": [
+           ],
+
+    "hyp": {mdl: f"data/subset500.{mdl}.trg.ref_order.txt" for mdl in ["bus", "pgc", "fas"]},
+    "ref": "data/subset500.trg.txt",
+
+}
+
+subset1000_data = {
+    "bus": [
+            # order: shard 0, 1, 2, ...
+            "data/mturk/summary/precision/mturk_data.10211029.jsonl",
+            "data/mturk/summary/precision/mturk_data.10211306.jsonl",
+            "data/mturk/summary/precision/mturk_data.10211417.jsonl",
+            "data/mturk/summary/precision/mturk_data.10231357.jsonl",
+            "data/mturk/summary/precision/mturk_data.10231529.jsonl",
+            # RERUN THE REMAINDER (missing one or two annotations)
+           ],
+
+    "pgc": [
+           ],
+
+    "fas": [
+           ],
+
+    "hyp": {mdl: f"data/subset1000.{mdl}.random.ref_order.txt" for mdl in ["bus", "pgc", "fas"]},
+    "ref": "data/subset1000.random.trg.txt",
+
+}
+
+# Settings
 mdl = "bus"
+exp_name = "subset1000"
+
+if exp_name == "subset500":
+    exp_d = subset500_data
+    n_qsts_per_doc = 5
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset500/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset500/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
+elif exp_name == "subset1000":
+    exp_d = subset1000_data
+    n_qsts_per_doc = 5
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
+else:
+    exp_d = subset100_data
+    n_qsts_per_doc = 10
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
+
+
 
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
-#aggregate_questions()
-#format_abstractive_qa()
-#process_human_subset()
-#compute_pair_judgments_rouge_correlations()
 
+
+
+#extract_subset()
 #align_summaries()
-#prepare_parlai_data()
+prepare_parlai_data()
 
-#evaluate_parlai_mturk(mdl2turk_data[mdl], mdl)
 
-compute_correctness_judgments_rouge_correlations(turk_files=mdl2turk_data[mdl],
-                                                 hyp_file=f"data/subset-{mdl}.txt",
-                                                 mdl=mdl)
+
+#compute_correlations_with_human(turk_files=exp_d[mdl],
+#                                ref_file=exp_d["ref"],
+#                                hyp_file=exp_d["hyp"][mdl],
+#                                mdl=mdl,
+#                                qags_src_file=qags_src_file,
+#                                qags_trg_file=qags_trg_file,
+#                                n_qsts_per_doc=n_qsts_per_doc
+#                                )
+
 
 #mturk_posthoc()
-#mturk_review_hits()

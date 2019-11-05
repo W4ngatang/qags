@@ -12,9 +12,14 @@ def set_args():
     curr_time = datetime.now()
     out_file = f"mturk_data.{curr_time.strftime('%m%d%H%M')}.jsonl"
     args['out_file'] = f'/home/awang/projects/qags/data/mturk/summary/precision/{out_file}'
+
     args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/summary'
-    shard_n = 4
+    #args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/xsum'
+    shard_n = 0
     args['model_comparisons'] = [
+                                 (f'src_para_nex5_randorder_shard{shard_n}', f'bart_sent_nex5_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex5_randorder_shard{shard_n}', f'bus_sent_nex5_randorder_shard{shard_n}'),
+
                                  #('src_para_short', 'bus_sent_short'),
                                  #('src_para_short', 'fas_sent_short'),
                                  #('src_para_short', 'pgc_sent_short'),
@@ -30,21 +35,31 @@ def set_args():
                                  #('src_para_short_attn_v2', 'pgc_sent_short_attn_v2'),
                                  #('src_para_short_attn_v2', 'trg_sent_short_attn_v2'),
 
-                                 (f'src_para_nex500_ref_order_shard{shard_n}', f'bus_sent_nex500_ref_order_shard{shard_n}'),
+                                 #(f'src_para_nex500_ref_order_shard{shard_n}', f'bus_sent_nex500_ref_order_shard{shard_n}'),
                                  #(f'src_para_nex500_ref_order_shard{shard_n}', f'fas_sent_nex500_ref_order_shard{shard_n}'),
                                  #(f'src_para_nex500_ref_order_shard{shard_n}', f'pgc_sent_nex500_ref_order_shard{shard_n}'),
                                  #(f'src_para_nex500_ref_order_shard{shard_n}', f'trg_sent_nex500_ref_order_shard{shard_n}'),
 
+                                 #(f'src_para_nex1000_randorder_shard{shard_n}', f'bus_sent_nex1000_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex1000_randorder_shard{shard_n}', f'fas_sent_nex1000_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex1000_randorder_shard{shard_n}', f'pgc_sent_nex1000_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex1000_randorder_shard{shard_n}', f'trg_sent_nex1000_randorder_shard{shard_n}'),
+
+                                 #(f'src_para_nex100_randorder_shard{shard_n}', f'bus_sent_nex100_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex100_randorder_shard{shard_n}', f'fas_sent_nex100_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex100_randorder_shard{shard_n}', f'pgc_sent_nex100_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex100_randorder_shard{shard_n}', f'trg_sent_nex100_randorder_shard{shard_n}'),
+
                                 ]
-    args['pairs_per_matchup'] = 100
-    args['annotations_per_pair'] = 2
+    args['pairs_per_matchup'] = 5
+    args['annotations_per_pair'] = 1
 
     # TODO(Alex): CHANGE ME!!!
     args['is_sandbox'] = False
     args['qual_percent_hits_approved'] = 98
     args['qual_n_hits_approved'] = 1000
+    args['min_time_threshold'] = 30
     args['block_qualification'] = 'aw_block_qags_precision_r8'
-    args['min_time_threshold'] = 15
 
 
     # Task definition
@@ -75,13 +90,15 @@ def set_args():
     # onboarding tasks
     #args['num_conversations'] = 10 + (len(args['model_comparisons']) * args['pairs_per_matchup'] * args['annotations_per_pair'])
     args['num_conversations'] = len(args['model_comparisons']) * args['pairs_per_matchup'] * args['annotations_per_pair']
-    args['assignment_duration_in_seconds'] = 600
+    args['assignment_duration_in_seconds'] = 1800
     args['reward'] = 1.00 # in dollars
     args['max_hits_per_worker'] = 100
 
     # Additional args that can be set - here we show the default values.
     # For a full list, refer to run.py & the ParlAI/parlai/params.py
     # args['seed'] = 42
+    args['verbose'] = False
+    args['is_debug'] = False
 
     return args
 

@@ -441,21 +441,23 @@ class TaskDescription extends React.Component {
         In this task, you will read an&nbsp;
         <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
         <div style={speaker2_style}>sentences</div> on the right.
-        You may need to scroll down to see the full article.
         <br/><br/>
       
         The task is to determine if the sentences are factually correct given the contents of the article.
-        Note that many sentences may contain portions of text copied directly from the article.
+        Note that many sentences contain portions of text copied directly from the article.
         Be careful as some sentences may be combinations of two different parts
         of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
-        <b>If the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
+        Some article sentences may seem out of place (for example, "Scroll down for video").
+        If the sentence is a copy of one of these article sentences, you should still treat it as factually supported.&nbsp;
+        Otherwise, <b>if the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
+        Also note that the article may be cut off at the end.
         <br/><br/>
 
-        <b>You should provide a text justification of your decision.&nbsp;
-        Failure to do so will result in your HITs being rejected.</b>
+        You should spend at least 30 seconds on this HIT and provide text justifications of your decisions.&nbsp;
+        <b>Failure to do so will result in your HITs being rejected.</b>
         <br/><br/>
 
-        You will do this for pairs of articles and sentences.&nbsp;
+        You will do this for multiple sentences.&nbsp;
         After you've made your selection, a [NEXT] button will appear on the left.&nbsp;
         <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>&nbsp;
         NOTE: please be sure to only accept one of this task at a time.&nbsp;
@@ -477,24 +479,26 @@ class TaskDescription extends React.Component {
       content = (
         <div>
           
-          <b>You are currently at comparison {cur_index} / {num_subtasks} </b>
+          <b>You are currently at comparison {cur_index} / {num_subtasks}</b>
           <br/><br/>
 
           In this task, you will read an&nbsp;
           <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
           <div style={speaker2_style}>sentences</div> on the right.
-          You may need to scroll down to see the full article.
-          <br/><br/>
-          
-          The task is to determine if the sentences are correct given the article.
-          Note that many sentences may contain portions of text copied directly from the article.
-          Be careful as some sentences may be combinations of two different parts
-          of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
-          <b>If the sentence is a fragment or doesn't make sense, you should mark it as not supported.</b>
           <br/><br/>
 
-          <b>You should provide a text justification of your decision.&nbsp;
-          Failure to do so will result in your HITs being rejected.</b>
+          The task is to determine if the sentences are factually correct given the contents of the article.
+          Note that many sentences contain portions of text copied directly from the article.
+          Be careful as some sentences may be combinations of two different parts
+          of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
+          Some article sentences may seem out of place (for example, "Scroll down for video").
+          If the sentence is a copy of one of these article sentences, you should still treat it as factually supported.&nbsp;
+          Otherwise, <b>if the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
+          Also note that the article may be cut off at the end.
+          <br/><br/>
+
+          You should spend at least 30 seconds on this HIT and provide text justifications of your decisions.&nbsp;
+          <b>Failure to do so will result in your HITs being rejected.</b>
           <br/><br/>
 
         </div>

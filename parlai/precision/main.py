@@ -29,7 +29,7 @@ onboarding_conv_ids = []
 onboarding_failed_workers = []
 ONBOARD_FAIL_MSG = 'Did not pass onboarding'
 SHORT_RESPONSE_MSG = 'Provided reason is too short'
-SHORT_TIME_MSG = 'Failed quality control'
+SHORT_TIME_MSG = 'Task completed too quickly'
 FAIL_ATTN_MSG = 'Failed quality control task'
 
 desired_tasks = {}
@@ -478,8 +478,9 @@ def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
     num_onboarding_tasks = 0
     num_correct = 0
 
+    did_fail = False
     short_msg_flag = 0
-    short_time_flag = 0 # currently not used
+    short_time_flag = 0
     fail_attn_flag = 0
 
     # min time check
@@ -496,14 +497,14 @@ def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
         choice_response = float(response['speakerChoice'])
 
         # one or more msg was too short
-        if (not text_response) or (len(text_response) < 2):
+        if (not text_response): # or (len(text_response) < 2):
             short_msg_flag = 1
 
         # attn check
         if task_specs['answer'] is not None:
             expected_response = 1 if task_specs['answer'] == 'yes' else 2
-            fail_attn_flag = bool(choice_response != expected_response) or fail_attn_flag
-
+            if choice_response != expected_response:
+                fail_attn_flag = 1
 
 
         # EVERYTHING AFTER THIS ONLY IS FOR ONBOARDING TASKS
@@ -549,26 +550,28 @@ def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
 
         # actually do the failing
         if fail_msg:
+            did_fail = True
             mturk_manager.reject_work(worker_data['assignment_id'], fail_msg)
             return_task_data(worker_id, task_data)
 
-        return
+        return did_fail
 
     # onboarding tasks
     if (num_correct / num_onboarding_tasks) >= threshold and not short_msg_flag:
         # Passed quality control, continue
-        return
+        pass
     else:
         # Failed quality control
         msg = SHORT_RESPONSE_MSG if short_msg_flag else ONBOARD_FAIL_MSG
         mturk_manager.reject_work(worker_data['assignment_id'], msg)
         mturk_manager.soft_block_worker(worker_id)
         onboarding_failed_workers.append(worker_id)
+        did_fail = True
         if bad_worker_fh is not None:
             bad_worker_fh.write(f"{worker_id}\n")
         print(f"\tSoft blocking worker {worker_id}")
 
-    return
+    return did_fail
 
 
 def main(opt, task_config):
@@ -618,6 +621,22 @@ def main(opt, task_config):
             'IntegerValues':[opt['qual_percent_hits_approved']]
         }
     ]
+    if opt['is_sandbox']:
+        #qualifications.append(
+        #    {
+        #        'QualificationTypeId': '00000000000000000071',
+        #        'Comparator': 'In',
+        #        'LocaleValues': [
+        #            {'Country': 'US', 'Subdivision': 'NY'},
+        #            {'Country': 'CA'},
+        #            {'Country': 'GB'},
+        #            {'Country': 'AU'},
+        #            {'Country': 'NZ'},
+        #        ],
+        #        'RequiredToPreview': True,
+        #    })
+        qualifications = []
+    print(f"Qualifications: {qualifications}")
 
     out_fh = open(opt['out_file'], 'w')
     if opt['bad_worker_file'] is not None:
@@ -649,6 +668,7 @@ def main(opt, task_config):
         # soon, in which case you just need to provide get_new_task_data() and
         # return_task_data()
         def run_conversation(mturk_manager, opt, workers):
+            print("Starting task...")
             task_data = get_new_task_data(workers[0], opt['comparisons_per_hit'])
 
             world = StaticMTurkTaskWorld(
@@ -658,24 +678,21 @@ def main(opt, task_config):
             )
             while not world.episode_done():
                 world.parley()
-            print("Finished running task.")
+            print("\tFinished running task.")
 
             world.shutdown()
-            #print("Finished shutting down.")
 
             to_save_data = world.prep_save_data(workers)
-            #print("Finished preparing save data.")
-
             if not world.did_complete():
                 print("\tDidn't finish HIT. Returning task data...")
                 return_task_data(workers[0].worker_id, task_data)
             elif opt['block_on_onboarding']:
-                #print("Reviewing onboarding...")
-                check_and_update_worker_approval(mturk_manager, data_handler,
-                                                 to_save_data,
-                                                 opt['onboarding_threshold'],
-                                                 opt['min_time_threshold'])
-                #print("\tDone reviewing onboarding")
+                print("\tFinished HIT. Checking work...")
+                did_fail = check_and_update_worker_approval(mturk_manager, data_handler,
+                                                            to_save_data,
+                                                            opt['onboarding_threshold'],
+                                                            opt['min_time_threshold'])
+                to_save_data['did_fail'] = did_fail
 
             save_data(to_save_data, out_fh)
             return to_save_data
@@ -698,13 +715,14 @@ def main(opt, task_config):
         # keep the world running until that point.
         mturk_manager.expire_all_unassigned_hits()
 
+        # Shutdown the manager and free all related resources
+        mturk_manager.shutdown()
+
         # Close file handles
         out_fh.close()
         if opt['bad_worker_file'] is not None:
             bad_worker_fh.close()
 
-        # Shutdown the manager and free all related resources
-        mturk_manager.shutdown()
 
         print(f"ALL ONBOARDING FAILED WORKERS: {onboarding_failed_workers}")
 
