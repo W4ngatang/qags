@@ -427,7 +427,7 @@ class PairwiseEvalPane extends React.Component {
 
 class TaskDescription extends React.Component {
   render () {
-    let header_text = "Is the sentence supported by the passage?";
+    let header_text = "Is the sentence supported by the article?";
 
     if (this.props.task_description === null) {
       return (<div>Loading</div>);
@@ -441,30 +441,22 @@ class TaskDescription extends React.Component {
         In this task, you will read an&nbsp;
         <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
         <div style={speaker2_style}>sentences</div> on the right.
-        <br/><br/>
-      
-        The task is to determine if the sentences are factually correct given the contents of the article.
-        Note that many sentences contain portions of text copied directly from the article.
-        Be careful as some sentences may be combinations of two different parts
-        of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
-        Some article sentences may seem out of place (for example, "Scroll down for video").
-        If the sentence is a copy of one of these article sentences, you should still treat it as factually supported.&nbsp;
-        Otherwise, <b>if the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
-        Also note that the article may be cut off at the end.
+        The task is to determine if the sentences are factually correct given the contents of the article.&nbsp;
+        <b>All parts of the sentence must be stated or implied by the article to be considered correct.</b>&nbsp;
+        If the sentence directly copies the article, you should mark it as supported.&nbsp;
+        If the sentence doesn't make sense, you should mark it as not supported.&nbsp;
         <br/><br/>
 
-        You should spend at least 30 seconds on this HIT and provide text justifications of your decisions.&nbsp;
-        <b>Failure to do so will result in your HITs being rejected.</b>
+        <b>If you correctly complete all tasks, we will award a $0.85 bonus</b>.&nbsp;
+        <b>You must spend at least 30 seconds on this HIT and provide text justifications of your decisions.</b>&nbsp;
         <br/><br/>
 
-        You will do this for multiple sentences.&nbsp;
+        You will be presented with multiple sentences, one at a time.&nbsp;
         After you've made your selection, a [NEXT] button will appear on the left.&nbsp;
         <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>&nbsp;
-        NOTE: please be sure to only accept one of this task at a time.&nbsp;
+        <b>NOTE: Please be sure to only accept one of this task at a time.</b>&nbsp;
         Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
         <br/><br/>
-
-        Please accept the task when you're ready.
 
       </div>
     );
@@ -486,19 +478,14 @@ class TaskDescription extends React.Component {
           <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
           <div style={speaker2_style}>sentences</div> on the right.
           <br/><br/>
-
-          The task is to determine if the sentences are factually correct given the contents of the article.
-          Note that many sentences contain portions of text copied directly from the article.
-          Be careful as some sentences may be combinations of two different parts
-          of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
-          Some article sentences may seem out of place (for example, "Scroll down for video").
-          If the sentence is a copy of one of these article sentences, you should still treat it as factually supported.&nbsp;
-          Otherwise, <b>if the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
-          Also note that the article may be cut off at the end.
+          The task is to determine if the sentences are factually correct given the contents of the article.&nbsp;
+          <b>All parts of the sentence must be stated or implied by the article to be considered correct.</b>&nbsp;
+          If the sentence directly copies the article, you should mark it as supported.&nbsp;
+          If the sentence doesn't make sense, you should mark it as not supported.&nbsp;
           <br/><br/>
 
-          You should spend at least 30 seconds on this HIT and provide text justifications of your decisions.&nbsp;
-          <b>Failure to do so will result in your HITs being rejected.</b>
+          <b>If you successfully complete all tasks, we will award a $0.85 bonus</b>.&nbsp;
+          <b>You should spend at least 30 seconds on this HIT and provide text justifications of your decisions.</b>&nbsp;
           <br/><br/>
 
         </div>

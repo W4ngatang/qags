@@ -7,6 +7,7 @@ import os
 import json
 import time
 import random
+from datetime import datetime
 from queue import Queue
 
 import numpy as np
@@ -26,11 +27,13 @@ task_queue = Queue()
 
 onboarding_tasks = {}
 onboarding_conv_ids = []
-onboarding_failed_workers = []
+blocked_workers = []
 ONBOARD_FAIL_MSG = 'Did not pass onboarding'
 SHORT_RESPONSE_MSG = 'Provided reason is too short'
-SHORT_TIME_MSG = 'Task completed too quickly'
+SHORT_TIME_MSG = 'Failed quality control'
 FAIL_ATTN_MSG = 'Failed quality control task'
+BONUS_MSG = 'Bonus for performing HIT well!'
+ALEX_ID = 'AA2U5PP5JHC3O'
 
 desired_tasks = {}
 conversations_to_tasks = {}
@@ -59,6 +62,11 @@ def make_flags(from_argv=False):
      '--bad_worker_file', type=str, default=None,
      help='(optional) path to file with workers to exclude'
     )
+    argparser.add_argument(
+     '--bonus_file', type=str, default=None,
+     help='(optional) path to file with bonuses awarded'
+    )
+
     argparser.add_argument(
      '--annotations_per_pair', type=int, default=1,
      help='Number of annotations per conversation comparison pair'
@@ -234,9 +242,8 @@ def setup_task_queue(opt):
     elif opt['model_comparisons']:
         n_pairs = opt['pairs_per_matchup']
         for model_0, model_1 in opt['model_comparisons']:
-            assert (model_0 in conv_ids_by_model and model_1 in conv_ids_by_model), \
-                    print(f"Found {conv_ids_by_model.keys()}\nPlease provide a list of tuples of valid models in --model_comparison")
-
+            assert model_0 in conv_ids_by_model, f"Couldn't find {model_1} in {data_folder}"
+            assert model_1 in conv_ids_by_model, f"Couldn't find {model_1} in {data_folder}"
             matchup_name = '{},{}'.format(model_0, model_1)
             conv_pairs = []
             all_model1_convs = [
@@ -466,15 +473,17 @@ def get_onboarding_tasks(worker_id, tasks_per_hit):
     return [onboarding_tasks[id] for id in onboarding_tasks_todo]
 
 
-def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
-                                     onboard_threshold, min_time_threshold=None,
-                                     bad_worker_fh=None):
-    """ Reject and soft block workers who fail onboarding tasks """
+def check_work(mturk_manager, data_handler, save_data,
+               bad_worker_fh=None,
+               onboard_threshold=1.0, min_time_threshold=None,
+               bonus_amount=0.0, bonus_fh=None):
+    """ Soft block workers who fail checks and pay bonuses to workers who did well """
 
     worker_id = [k for k in save_data['worker_data'].keys()][0]
     worker_data = save_data['worker_data'][worker_id]
     task_data = worker_data['task_data']
     responses = worker_data['response']
+    asgn_id = worker_data['assignment_id']
     num_onboarding_tasks = 0
     num_correct = 0
 
@@ -485,7 +494,7 @@ def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
 
     # min time check
     if min_time_threshold is not None:
-        resp = data_handler.get_worker_assignment_pairing(worker_id, worker_data['assignment_id'])
+        resp = data_handler.get_worker_assignment_pairing(worker_id, asgn_id)
         hit_time = resp['task_end'] - resp['task_start']
         short_time_flag = bool(hit_time < min_time_threshold)
 
@@ -529,8 +538,8 @@ def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
         fail_msg = ''
 
         # auto-fail workers who didn't pass onboarding
-        if worker_id in onboarding_failed_workers:
-            print(f"\tWorker {worker_id} failed onboarding")
+        if worker_id in blocked_workers:
+            print(f"\tWorker {worker_id} is (soft) blocked")
             fail_msg = ONBOARD_FAIL_MSG
 
         # fail workers who worked implausibly quickly
@@ -551,21 +560,36 @@ def check_and_update_worker_approval(mturk_manager, data_handler, save_data,
         # actually do the failing
         if fail_msg:
             did_fail = True
-            mturk_manager.reject_work(worker_data['assignment_id'], fail_msg)
+            #mturk_manager.reject_work(worker_data['assignment_id'], fail_msg)
+            mturk_manager.soft_block_worker(worker_id)
+            blocked_workers.append(worker_id)
             return_task_data(worker_id, task_data)
-
-        return did_fail
+            if bad_worker_fh is not None:
+                bad_worker_fh.write(f"{worker_id}\n")
+            print(f"\tSoft blocking worker {worker_id}")
+        else:
+            # pay out bonus
+            curr_time = datetime.now()
+            request_tok = f"{worker_id}-{curr_time.strftime('%m%d%H%M')}"
+            mturk_manager.pay_bonus(worker_id=worker_id,
+                                    bonus_amount=bonus_amount,
+                                    assignment_id=asgn_id,
+                                    reason=BONUS_MSG,
+                                    unique_request_token=request_tok)
+            if bonus_fh is not None:
+                bonus_fh.write(f"{worker_id},{asgn_id},{request_tok},{bonus_amount}\n")
+            print(f"\tPaid ${bonus_amount} to {worker_id}")
 
     # onboarding tasks
-    if (num_correct / num_onboarding_tasks) >= threshold and not short_msg_flag:
+    elif (num_correct / num_onboarding_tasks) >= threshold and not short_msg_flag:
         # Passed quality control, continue
         pass
     else:
         # Failed quality control
         msg = SHORT_RESPONSE_MSG if short_msg_flag else ONBOARD_FAIL_MSG
-        mturk_manager.reject_work(worker_data['assignment_id'], msg)
+        #mturk_manager.reject_work(worker_data['assignment_id'], msg)
         mturk_manager.soft_block_worker(worker_id)
-        onboarding_failed_workers.append(worker_id)
+        blocked_workers.append(worker_id)
         did_fail = True
         if bad_worker_fh is not None:
             bad_worker_fh.write(f"{worker_id}\n")
@@ -619,7 +643,7 @@ def main(opt, task_config):
             'QualificationTypeId': '000000000000000000L0',
             'Comparator':'GreaterThan',
             'IntegerValues':[opt['qual_percent_hits_approved']]
-        }
+        },
     ]
     if opt['is_sandbox']:
         #qualifications.append(
@@ -640,23 +664,35 @@ def main(opt, task_config):
 
     out_fh = open(opt['out_file'], 'w')
     if opt['bad_worker_file'] is not None:
-        with open(opt['bad_worker_file'], 'r') as bad_worker_fh:
-            workers_to_block = [worker.strip() for worker in bad_worker_fh]
+        print(f"Logging bad workers in {opt['bad_worker_file']}.")
+        if os.path.exists(opt['bad_worker_file']):
+            with open(opt['bad_worker_file'], 'r') as bad_worker_fh:
+                workers_to_block = [worker.strip() for worker in bad_worker_fh]
+            print(f"\tLoaded {len(workers_to_block)} bad workers from {opt['bad_worker_file']}.")
+        else:
+            print(f"\tNo previous bad workers from {opt['bad_worker_file']}.")
         bad_worker_fh = open(opt['bad_worker_file'], 'a')
+    if opt['bonus_file'] is not None:
+        bonus_fh = open(opt['bonus_file'], 'a')
+        print(f"Logging bonuses awarded to {opt['bonus_file']}.")
 
     try:
         # Initialize run information
         mturk_manager.start_new_run()
+
+        # (Soft) block bad workers
+        if opt['bad_worker_file'] is not None:
+            for worker_id in workers_to_block:
+                mturk_manager.soft_block_worker(worker_id)
+                blocked_workers.append(worker_id)
+            mturk_manager.un_soft_block_worker(ALEX_ID)
+
 
         # Set up the sockets and threads to recieve workers
         mturk_manager.ready_to_accept_workers()
 
         # Create the hits as specified by command line arguments
         mturk_manager.create_hits(qualifications=qualifications)
-
-        if opt['bad_worker_file'] is not None:
-            for worker_id in workers_to_block:
-                mturk_manager.soft_block_worker(worker_id)
 
         def check_worker_eligibility(worker):
             return True
@@ -668,9 +704,9 @@ def main(opt, task_config):
         # soon, in which case you just need to provide get_new_task_data() and
         # return_task_data()
         def run_conversation(mturk_manager, opt, workers):
-            print("Starting task...")
             task_data = get_new_task_data(workers[0], opt['comparisons_per_hit'])
 
+            print("Started task...")
             world = StaticMTurkTaskWorld(
                 opt,
                 mturk_agent=workers[0],
@@ -683,15 +719,19 @@ def main(opt, task_config):
             world.shutdown()
 
             to_save_data = world.prep_save_data(workers)
+
             if not world.did_complete():
                 print("\tDidn't finish HIT. Returning task data...")
                 return_task_data(workers[0].worker_id, task_data)
             elif opt['block_on_onboarding']:
                 print("\tFinished HIT. Checking work...")
-                did_fail = check_and_update_worker_approval(mturk_manager, data_handler,
-                                                            to_save_data,
-                                                            opt['onboarding_threshold'],
-                                                            opt['min_time_threshold'])
+                did_fail = check_work(mturk_manager, data_handler,
+                                      to_save_data,
+                                      bad_worker_fh=bad_worker_fh,
+                                      onboard_threshold=opt['onboarding_threshold'],
+                                      min_time_threshold=opt['min_time_threshold'],
+                                      bonus_amount=opt['bonus_reward'],
+                                      bonus_fh=bonus_fh)
                 to_save_data['did_fail'] = did_fail
 
             save_data(to_save_data, out_fh)
@@ -722,9 +762,11 @@ def main(opt, task_config):
         out_fh.close()
         if opt['bad_worker_file'] is not None:
             bad_worker_fh.close()
+        if opt['bonus_file'] is not None:
+            bonus_fh.close()
 
 
-        print(f"ALL ONBOARDING FAILED WORKERS: {onboarding_failed_workers}")
+        print(f"SOFTBLOCKED WORKERS: {blocked_workers}")
 
 
 if __name__ == '__main__':

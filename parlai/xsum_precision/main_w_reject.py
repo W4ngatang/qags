@@ -29,7 +29,7 @@ onboarding_conv_ids = []
 onboarding_failed_workers = []
 ONBOARD_FAIL_MSG = 'Did not pass onboarding'
 SHORT_RESPONSE_MSG = 'Provided reason is too short'
-SHORT_TIME_MSG = 'Task completed too quickly'
+SHORT_TIME_MSG = 'Failed quality control'
 FAIL_ATTN_MSG = 'Failed quality control task'
 
 desired_tasks = {}
@@ -234,9 +234,8 @@ def setup_task_queue(opt):
     elif opt['model_comparisons']:
         n_pairs = opt['pairs_per_matchup']
         for model_0, model_1 in opt['model_comparisons']:
-            assert (model_0 in conv_ids_by_model and model_1 in conv_ids_by_model), \
-                    print(f"Found {conv_ids_by_model.keys()}\nPlease provide a list of tuples of valid models in --model_comparison")
-
+            assert model_0 in conv_ids_by_model, f"Couldn't find {model_1} in {data_folder}"
+            assert model_1 in conv_ids_by_model, f"Couldn't find {model_1} in {data_folder}"
             matchup_name = '{},{}'.format(model_0, model_1)
             conv_pairs = []
             all_model1_convs = [
@@ -619,7 +618,7 @@ def main(opt, task_config):
             'QualificationTypeId': '000000000000000000L0',
             'Comparator':'GreaterThan',
             'IntegerValues':[opt['qual_percent_hits_approved']]
-        }
+        },
     ]
     if opt['is_sandbox']:
         #qualifications.append(
@@ -668,9 +667,9 @@ def main(opt, task_config):
         # soon, in which case you just need to provide get_new_task_data() and
         # return_task_data()
         def run_conversation(mturk_manager, opt, workers):
-            print("Starting task...")
             task_data = get_new_task_data(workers[0], opt['comparisons_per_hit'])
 
+            print("Starting task...")
             world = StaticMTurkTaskWorld(
                 opt,
                 mturk_agent=workers[0],
@@ -683,6 +682,7 @@ def main(opt, task_config):
             world.shutdown()
 
             to_save_data = world.prep_save_data(workers)
+
             if not world.did_complete():
                 print("\tDidn't finish HIT. Returning task data...")
                 return_task_data(workers[0].worker_id, task_data)

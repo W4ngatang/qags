@@ -133,7 +133,8 @@ function predict_extractive() {
     date="06-25-2019"
     squad_version="v2_0"
     qg_ckpt="best"
-    n_qsts=5
+    n_qsts=6
+    dataset="xsum-random1000"
 
     #for gen_mdl in bus-subset fan-subset pgc-subset; do
     for txt_fld in gen src; do
@@ -141,11 +142,13 @@ function predict_extractive() {
             gen_mdl="pgc-subset500"
             #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
             #pred_file="/private/home/wangalexc/projects/qags/data/subset500/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
-            pred_file="/private/home/wangalexc/projects/qags/data/subset500/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
+            pred_file="/private/home/wangalexc/projects/qags/data/xsum/random1000/qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
 
             mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
-            out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
-            out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
+            #out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
+            out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${dataset}/bart"
+            #out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
+            out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
             mkdir -p ${out_dir}
 
             # NOTE(Alex): maybe need --version_2_with_negative \
@@ -169,15 +172,20 @@ function predict_extractive() {
 
 function evaluate_answers() {
     squad_version="2_0"
-    n_qst=5
+    n_qst=6
     qg_ckpt="best"
-    gen_mdl="pgc-subset500"
+    #gen_mdl="pgc-subset500"
+    dataset="xsum-random1000"
+    gen_mdl="bart"
     qst_src="gen"
     txt_fld="gen"
 
-    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-src.json
-    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json
-    out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/
+    #src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-src.json
+    #trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json
+    #out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/
+    out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${dataset}/${gen_mdl}
+    src_file=${out_dir}/xsum-prd.qst${n_qst}-${qst_src}.cnndm-src.json
+    trg_file=${out_dir}/xsum-prd.qst${n_qst}-${qst_src}.cnndm-${txt_fld}.json
     #corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}.scores.txt
     corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/qags-subset-human-eval-means.csv
 

@@ -154,7 +154,13 @@ class ChatPane extends React.Component {
       'width': '100%', position: 'relative', 'overflowY': 'scroll'
     };
 
-    let chat_style = {
+    let left_chat_style = {
+      'width': '100%', height: '100%', 'paddingTop': '60px',
+      'paddingLeft': '20px', 'paddingRight': '20px',
+      'paddingBottom': '20px', 'overflowY': 'scroll'
+    };
+
+    let right_chat_style = {
       'width': '100%', height: '100%', 'paddingTop': '60px',
       'paddingLeft': '20px', 'paddingRight': '20px',
       'paddingBottom': '20px', 'overflowY': 'scroll'
@@ -172,7 +178,7 @@ class ChatPane extends React.Component {
         <Grid className="show-grid" style={{width: 'auto'}}>
           <Row>
             <Col sm={8}>
-              <div id="message-pane-segment-left" style={chat_style} >
+              <div id="message-pane-segment-left" style={left_chat_style} >
                 <XMessageList
                   {...this.props}
                   index={0}
@@ -180,7 +186,7 @@ class ChatPane extends React.Component {
               </div>
             </Col>
             <Col sm={4}>
-              <div id="message-pane-segment-right" style={chat_style} >
+              <div id="message-pane-segment-right" style={right_chat_style} >
                 <XMessageList
                   {...this.props}
                   index={1}
@@ -427,7 +433,7 @@ class PairwiseEvalPane extends React.Component {
 
 class TaskDescription extends React.Component {
   render () {
-    let header_text = "Is the sentence supported by the passage?";
+    let header_text = "Is the main idea of the sentence in the passage?";
 
     if (this.props.task_description === null) {
       return (<div>Loading</div>);
@@ -439,25 +445,19 @@ class TaskDescription extends React.Component {
       <div>
 
         In this task, you will read an&nbsp;
-        <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
+        <div style={speaker1_style}>passage</div> on the left and a series of&nbsp;
         <div style={speaker2_style}>sentences</div> on the right.
         <br/><br/>
       
-        The task is to determine if the sentences are factually correct given the contents of the article.
-        Note that many sentences contain portions of text copied directly from the article.
-        Be careful as some sentences may be combinations of two different parts
-        of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
-        Some article sentences may seem out of place (for example, "Scroll down for video").
-        If the sentence is a copy of one of these article sentences, you should still treat it as factually supported.&nbsp;
-        Otherwise, <b>if the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
-        Also note that the article may be cut off at the end.
+        The task is to determine if the main points of the sentences are present in the passage.&nbsp;
+        If a sentence in the passage is a fragment or doesn't make sense, you should ignore that passage sentence.&nbsp;
         <br/><br/>
 
-        You should spend at least 30 seconds on this HIT and provide text justifications of your decisions.&nbsp;
-        <b>Failure to do so will result in your HITs being rejected.</b>
+        You should also provide a text justification of your decision.&nbsp;
+        <b>Failure to do so will result in your HITs being rejected.</b>&nbsp;
         <br/><br/>
 
-        You will do this for multiple sentences.&nbsp;
+        You will do this for pairs of articles and sentences.&nbsp;
         After you've made your selection, a [NEXT] button will appear on the left.&nbsp;
         <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>&nbsp;
         NOTE: please be sure to only accept one of this task at a time.&nbsp;
@@ -479,26 +479,21 @@ class TaskDescription extends React.Component {
       content = (
         <div>
           
-          <b>You are currently at comparison {cur_index} / {num_subtasks}</b>
+          <b>You are currently at comparison {cur_index} / {num_subtasks} </b>
           <br/><br/>
 
           In this task, you will read an&nbsp;
           <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
           <div style={speaker2_style}>sentences</div> on the right.
+          You may need to scroll down to see the full article.
+          <br/><br/>
+          
+          The task is to determine if the main points of the sentences are present in the article.&nbsp;
+          If a sentence in the passage is a fragment or doesn't make sense, you should ignore that passage sentence.&nbsp;
           <br/><br/>
 
-          The task is to determine if the sentences are factually correct given the contents of the article.
-          Note that many sentences contain portions of text copied directly from the article.
-          Be careful as some sentences may be combinations of two different parts
-          of the article, resulting in sentences that overall aren't supported by the article.&nbsp;
-          Some article sentences may seem out of place (for example, "Scroll down for video").
-          If the sentence is a copy of one of these article sentences, you should still treat it as factually supported.&nbsp;
-          Otherwise, <b>if the sentence doesn't make sense, you should mark it as not supported</b>.&nbsp;
-          Also note that the article may be cut off at the end.
-          <br/><br/>
-
-          You should spend at least 30 seconds on this HIT and provide text justifications of your decisions.&nbsp;
-          <b>Failure to do so will result in your HITs being rejected.</b>
+          You should also provide a text justification of your decision.
+          Failure to do so will result in your HITs being rejected.
           <br/><br/>
 
         </div>
