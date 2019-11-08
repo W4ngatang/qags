@@ -17,7 +17,7 @@ def set_args():
     args['bad_worker_file'] = f'/home/awang/projects/qags/data/mturk/bad_workers.txt'
     args['bonus_file'] = f'/home/awang/projects/qags/data/mturk/bonuses_awarded.csv'
     args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/xsum'
-    shard_n = 0
+    shard_n = 1
     args['model_comparisons'] = [
                                  #(f'src_para_nex5_randorder_shard{shard_n}', f'bart_sent_nex5_randorder_shard{shard_n}'),
                                  #(f'src_para_nex10_randorder_shard{shard_n}', f'bart_sent_nex10_randorder_shard{shard_n}'),

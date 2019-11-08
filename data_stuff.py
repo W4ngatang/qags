@@ -432,7 +432,6 @@ def prepare_parlai_data():
             src = src.replace(k, v)
         srcs.append(src)
     if dataset == 'xsum':
-        #srcs_sents = [sent_tokenize(src) for src in srcs]
         srcs_sents = [[detokenize_sent(s) for s in sent_tokenize(src)] for src in srcs]
     elif dataset == 'cnndm':
         srcs_sents = [[detokenize_sent(s) for s in sent_tokenize(src)] for src in srcs]
@@ -552,7 +551,7 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
     resp_map = {'1': 1, '2': 0}
 
     # Load mturk data
-    n_hits, n_desk_rejects, n_total = 0, 0, 0
+    n_hits, n_rejected_hits, n_total_hits = 0, 0, 0
     idxs = list()
     idx2responses = defaultdict(lambda: defaultdict(list))
     for turk_file in turk_files:
@@ -560,26 +559,27 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         for datum in mturk_data:
             for worker_id, worker in datum['worker_data'].items():
 
-                n_total += 1
+                n_total_hits += 1
                 # Filter out bad reponses
-                short_msg_flag, attn_fail_flag = 0, 0
+                bad_resp_flag, short_msg_flag, attn_fail_flag = 0, 0, 0
                 ## filter out returns and discounnects
                 if worker['response']['text'] in MTURK_BAD_RESPONSES:
-                    n_desk_rejects += 1
-                    continue
+                    bad_resp_flag = 1
                 ## filter out short responses
-                for response in worker['response']['task_data']:
-                    if not response.get('textReason', ''):
-                        short_msg_flag = True
-                ## filter out attn check fails
-                for task_idx, task in enumerate(worker['task_data']):
-                    if task['conversations'][1].get('answer', None) is not None:
-                        choice = int(worker['response']['task_data'][task_idx]['speakerChoice'])
-                        expected = 1 if task['conversations'][1]['answer'] == 'yes' else 2
-                        if choice != expected:
-                            attn_fail_flag = True
-                # filter out too short time ?
-                if short_msg_flag or attn_fail_flag:
+                if 'task_data' in worker['response']:
+                    for response in worker['response']['task_data']:
+                        if not response.get('textReason', ''):
+                            short_msg_flag = True
+                    ## filter out attn check fails
+                    for task_idx, task in enumerate(worker['task_data']):
+                        if task['conversations'][1].get('answer', None) is not None:
+                            choice = int(worker['response']['task_data'][task_idx]['speakerChoice'])
+                            expected = 1 if task['conversations'][1]['answer'] == 'yes' else 2
+                            if choice != expected:
+                                attn_fail_flag = True
+                # filter out too short time
+                if bad_resp_flag or short_msg_flag or attn_fail_flag:
+                    n_rejected_hits += 1
                     continue
 
                 n_hits += 1
@@ -623,6 +623,7 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
             if sent_idx in ATTN_IDXS:
                 continue
             assert votes, "No votes!"
+            #votes = votes[:3]
             votes0 = votes.count(0)
             votes1 = votes.count(1)
             if votes1 >= votes0:
@@ -657,7 +658,7 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
             n_all_responses_no += 1
 
     print(f"Loaded data from {len(idxs)} articles, {n_tasks} tasks, {n_hits} HITS")
-    print(f"\tn desk reject {n_desk_rejects}, n total HITS {n_total}")
+    print(f"\tn rejected {n_rejected_hits}, n total HITS {n_total_hits}")
     print(f"\tn_yes responses {n_yes}; n_no responses {n_no}")
     print(f"\tn tasks all responses yes {n_all_votes_yes}; no {n_all_votes_no}; n_disagreement {n_tasks - n_all_votes_yes - n_all_votes_no}")
     print(f"\t{len(odd_human_scores)} / {len(human_scores)} ({100 * len(odd_human_scores)/len(human_scores):.2f}%) articles with odd number of labels")
@@ -720,15 +721,17 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
 
     print(f"All examples")
     compute_rouge_correlation(idxs, human_scores)
-    compute_qags_correlation(idxs, human_scores, metric_name="em")
-    compute_qags_correlation(idxs, human_scores, metric_name="f1")
+    if qags_src_file:
+        compute_qags_correlation(idxs, human_scores, metric_name="em")
+        compute_qags_correlation(idxs, human_scores, metric_name="f1")
     compute_fleiss(idx2responses)
     print()
 
     print(f"Examples with odd # labels ({len(odd_idxs)})")
     compute_rouge_correlation(odd_idxs, odd_human_scores)
-    compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="em")
-    compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="f1")
+    if qags_src_file:
+        compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="em")
+        compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="f1")
     compute_fleiss(odd_kappas)
 
 
@@ -831,20 +834,38 @@ subset1000_data = {
 
 }
 
+xsum_subset1000_data = {
+    "bart": [
+            # order: shard 0, 1, 2, ...
+            "data/mturk/xsum/precision/mturk_data.11051235.jsonl",
+            "data/mturk/xsum/precision/mturk_data.11060913.jsonl",
+           ],
+
+    "hyp": {"bart": "data/xsum.test.bart.10251125.random1000.txt"},
+    "ref": "data/xsum.test.trg.10251125.random1000.txt",
+}
+
 # Settings
-mdl = "bus"
-exp_name = "subset1000"
+mdl = "bart"
+exp_name = "xsum-subset1000"
 
 if exp_name == "subset500":
     exp_d = subset500_data
     n_qsts_per_doc = 5
     qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset500/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
     qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset500/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
+
 elif exp_name == "subset1000":
     exp_d = subset1000_data
     n_qsts_per_doc = 5
     qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
     qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
+
+elif exp_name == "xsum-subset1000":
+    exp_d = xsum_subset1000_data
+    n_qsts_per_doc = 6
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-src.xsum-gen.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-gen.json"
 else:
     exp_d = subset100_data
     n_qsts_per_doc = 10
@@ -853,25 +874,26 @@ else:
 
 
 
+
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
-
+#aggregate_questions()
 
 
 #extract_subset()
 #align_summaries()
-prepare_parlai_data()
+#prepare_parlai_data()
 
 
 
-#compute_correlations_with_human(turk_files=exp_d[mdl],
-#                                ref_file=exp_d["ref"],
-#                                hyp_file=exp_d["hyp"][mdl],
-#                                mdl=mdl,
-#                                qags_src_file=qags_src_file,
-#                                qags_trg_file=qags_trg_file,
-#                                n_qsts_per_doc=n_qsts_per_doc
-#                                )
+compute_correlations_with_human(turk_files=exp_d[mdl],
+                                ref_file=exp_d["ref"],
+                                hyp_file=exp_d["hyp"][mdl],
+                                mdl=mdl,
+                                qags_src_file=qags_src_file,
+                                qags_trg_file=qags_trg_file,
+                                n_qsts_per_doc=n_qsts_per_doc
+                                )
 
 
 #mturk_posthoc()
