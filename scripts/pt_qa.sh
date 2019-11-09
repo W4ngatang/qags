@@ -130,50 +130,65 @@ function evaluate_v2_0() {
 
 function predict_extractive() {
 
+    ckpt_dir="/misc/vlgscratch4/BowmanGroup/awang/ckpts"
     date="06-25-2019"
     squad_version="v2_0"
     qg_ckpt="best"
-    n_qsts=10
+    n_qsts=6
+    dataset="xsum-random1000"
+    ckpt_dir="${ckpt_dir}/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}"
 
     #for gen_mdl in bus-subset fan-subset pgc-subset; do
     for txt_fld in gen src; do
-        #for qst_src in gen src; do
-        gen_mdl="bus-subset"
+        for qst_src in gen src; do
+            gen_mdl="pgc-subset500"
+            #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
+            #pred_file="/private/home/wangalexc/projects/qags/data/subset500/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
+            #pred_file="/private/home/wangalexc/projects/qags/data/xsum/random1000/qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
+            pred_file="/home/awang/projects/qags/data/xsum/random1000/qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
 
-        #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
-        pred_file="/private/home/wangalexc/projects/qags/data/subset500/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
-        mdl_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/"
-        out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
-        out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
-        mkdir -p ${out_dir}
+            mdl_dir="${ckpt_dir}"
+            #out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
+            out_dir="${ckpt_dir}/${dataset}/bart"
+            #out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
+            out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
+            mkdir -p ${out_dir}
 
-        # NOTE(Alex): maybe need --version_2_with_negative \
-        python finetune_pt_squad.py \
-          --bert_model ${bert_version} \
-          --do_predict \
-          --do_lower_case \
-          --predict_file ${pred_file} \
-          --max_seq_length 384 \
-          --doc_stride 128 \
-          --output_dir ${out_dir} \
-          --prediction_file ${out_file} \
-          --overwrite_output_dir \
-          --load_model_from_dir ${mdl_dir} \
-          --version_2_with_negative;
+            # NOTE(Alex): maybe need --version_2_with_negative \
+            python finetune_pt_squad.py \
+              --bert_model ${bert_version} \
+              --do_predict \
+              --do_lower_case \
+              --predict_file ${pred_file} \
+              --max_seq_length 384 \
+              --doc_stride 128 \
+              --output_dir ${out_dir} \
+              --prediction_file ${out_file} \
+              --overwrite_output_dir \
+              --load_model_from_dir ${mdl_dir} \
+              --version_2_with_negative;
 
-        #done;
+        done;
     done;
 
 }
 
 function evaluate_answers() {
     squad_version="2_0"
-    n_qst=10
-    qg_ckpt=25
+    n_qst=6
+    qg_ckpt="best"
+    #gen_mdl="pgc-subset500"
+    dataset="xsum-random1000"
+    gen_mdl="bart"
+    qst_src="gen"
+    txt_fld="gen"
 
-    src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-src.json
-    trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json
-    out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/
+    #src_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-src.json
+    #trg_file=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/prd.qst${n_qst}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json
+    #out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${gen_mdl}/
+    out_dir=/checkpoint/wangalexc/ppb/${bert_version}/squad_v${squad_version}/06-25-2019-v${squad_version}/${dataset}/${gen_mdl}
+    src_file=${out_dir}/xsum-prd.qst${n_qst}-${qst_src}.cnndm-src.json
+    trg_file=${out_dir}/xsum-prd.qst${n_qst}-${qst_src}.cnndm-${txt_fld}.json
     #corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/${gen_mdl}.scores.txt
     corr_file=/private/home/wangalexc/projects/qags/data/labeled-subset/qags-subset-human-eval-means.csv
 

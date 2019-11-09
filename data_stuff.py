@@ -18,7 +18,7 @@ import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 from nltk.tokenize import sent_tokenize
 from nltk import agreement
-from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
+#from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
 
 from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
@@ -30,6 +30,41 @@ N_SAMPLES = 5
 ATTN_IDXS = [-2, -3]
 MTURK_BAD_RESPONSES = ['[DISCONNECT]', '[RETURNED]']
 
+JOIN_PUNCT = {'- lrb -': '-lrb-', '- rrb -': '-rrb-',
+              'n \' t ': 'n\'t ', '\' s ': '\'s ', ' \' ve ': '\'ve ',
+              ' \' m ': '\'m ', ' \' re ': ' \'re ', '\' d ': '\'d ',
+              ' \' ll ': ' \'ll '
+             }
+REPLACE_PUNCT = {'-lrb-': '(', '-rrb-': ')', '-lsb-': '[', '-rsb-': ']', '#': '$'}
+NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m', '\'ve', '\'d', '?', '!', 'n\'t', '\'re', '\'']
+NO_TRAILING_SPACE_PUNCT = [' `']#, ' \'']
+
+
+def detokenize_sent(sent):
+    """ Detokenize sents for readability, including:
+
+    - capitalizing first word of sentence (missing for proper nouns for English)
+    - remove extra spaces
+    - swap -lrb- and -rrb- for [, ] respectively
+    """
+    sent = sent.capitalize()
+    for k, v in REPLACE_PUNCT.items():
+        sent = sent.replace(k, v)
+    for punct in NO_LEADING_SPACE_PUNCT:
+        sent = sent.replace(f' {punct}', punct)
+    for punct in NO_TRAILING_SPACE_PUNCT:
+        sent = sent.replace(f'{punct} ', punct)
+    return sent
+
+
+def filter_qsts(qsts, n_qsts):
+    """ Filter out questions by a number of criteria
+
+    - repetitions: exact repetitions, high ngram overlap
+    - weird grammatical quirks: text after question marks
+
+    """
+    return qsts[:n_qsts]
 
 def get_qags_scores(src_ans_file, trg_ans_file, metric_name="em", n_qsts_per_doc=10):
     """Load answer files and compute similarity scores
@@ -136,7 +171,55 @@ def extract_subset():
     print(f"Done!")
 
 
-def aggregate_questions():
+
+def aggregate_questions_from_txt():
+    """ Extract questions generated from src, trg, and gen
+    with the corresponding field from fseq logs (one log/txt) and write to jsonl.
+    Each fseq log should have the txt field as 'source' (S)
+    and the questions as generated 'hypotheses' (H) """
+
+    n_exs = 1000
+    n_gen_qsts = 50 # n questions generated per doc
+    n_qsts = 10
+    src_txt_file = f"/private/home/wangalexc/data/xsum/random{n_exs}/src2bart/raw/test.src"
+    gen_txt_file = f"/private/home/wangalexc/data/xsum/random{n_exs}/bart2src/raw/test.src"
+    src_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/src2bart/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
+    gen_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/bart2src/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
+    out_dir = f"/private/home/wangalexc/projects/qags/data/xsum/random{n_exs}"
+
+    files = {
+             "src": {"txt": src_txt_file, "qst": src_qst_file},
+             "gen": {"txt": gen_txt_file, "qst": gen_qst_file},
+            }
+
+    all_txts, all_qsts = {}, {}
+    for txt_fld, field_files in files.items():
+        txts = load_txt(field_files["txt"])
+        qsts = load_txt(field_files["qst"])
+        all_txts[txt_fld] = txts
+        all_qsts[txt_fld] = qsts
+
+    # for each (question from a source x txt source) pair,
+    # build the data then write out a SQuAD format file
+    for txt_fld, qst_src in itertools.product(all_txts, all_qsts):
+        txts = all_txts[txt_fld]
+        qsts = all_qsts[qst_src]
+
+        raw_data = {}
+        for i in range(n_exs):
+            txt = txts[i]
+            cand_qsts = qsts[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
+            qst = [[q] for q in filter_qsts(cand_qsts, n_qsts=n_qsts)]
+            raw_data[i] = {txt_fld: txt, "hypotheses": qst}
+
+        data = format_squad(raw_data, context=txt_fld)
+        out_file = f"{out_dir}/qst{n_qsts}-{qst_src}.xsum_random1000-{txt_fld}.json"
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
+        json.dump(data, open(out_file, "w", encoding="utf-8"))
+
+
+def aggregate_questions_from_fseq_log():
     """ Extract questions generated from src, trg, and gen
     with the corresponding field from fseq logs (one log/txt) and write to jsonl.
     Each fseq log should have the txt field as 'source' (S)
@@ -145,18 +228,16 @@ def aggregate_questions():
     #for model in ["pgc-subset", "fan-subset", "bus-subset"]:
     for ckpt in ["best"]:
         for n_qsts in [5]:
-            model = "bus-subset"
+            #model = "trg-subset500"
+            #src_qst_file = f"/checkpoint/wangalexc/fairseq/10-11-2019/qst5-ckpt{ckpt}.src-subset500.cnndm.test.txt"
+            #gen_qst_file = f"/checkpoint/wangalexc/fairseq/10-11-2019/qst5-ckpt{ckpt}.{model}.cnndm.test.txt"
 
-            #src_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.src-onmt-order.cnndm.test.out"
-            #trg_qst_file = f"/checkpoint/wangalexc/fairseq/07-11-2019/qst.trg-onmt-order.cnndm.test.out"
-            #gen_qst_file = f"/checkpoint/wangalexc/fairseq/07-18-2019/qst.{model}.cnndm.test.out"
-
-            src_qst_file = f"/checkpoint/wangalexc/fairseq/10-11-2019/qst5-ckpt{ckpt}.src-subset.cnndm.test.txt"
-            gen_qst_file = f"/checkpoint/wangalexc/fairseq/11-11-2019/qst5-ckpt{ckpt}.{model}.cnndm.test.txt"
+            n_qsts = 6
+            src_qst_file = f"/checkpoint/wangalexc/bart/src2bart/denoising.8.60.1.0.nhyps10.processed"
+            gen_qst_file = f"/checkpoint/wangalexc/bart/bart2src/denoising.8.60.1.0.nhyps10.processed"
 
             qst_files = {
                          "src": src_qst_file,
-                         #"trg": trg_qst_file,
                          "gen": gen_qst_file
                         }
 
@@ -183,38 +264,11 @@ def aggregate_questions():
                     raw_data[k] = {txt_fld: txt, "hypotheses": qst}
 
                 data = format_squad(raw_data, context=txt_fld)
-                out_dir = f"/private/home/wangalexc/projects/qags/data/labeled-subset/{model}"
+                out_dir = f"/private/home/wangalexc/projects/qags/data/subset500/{model}"
                 out_file = f"{out_dir}/qst{n_qsts}-ckpt{ckpt}-{qst_src}.cnndm-{txt_fld}.json"
                 if not os.path.exists(out_dir):
                     os.mkdir(out_dir)
                 json.dump(data, open(out_file, "w", encoding="utf-8"))
-
-
-JOIN_PUNCT = {'- lrb -': '-lrb-', '- rrb -': '-rrb-',
-              'n \' t ': 'n\'t ', '\' s ': '\'s ', ' \' ve ': '\'ve ',
-              ' \' m ': '\'m ', ' \' re ': ' \'re ', '\' d ': '\'d ',
-              ' \' ll ': ' \'ll '
-             }
-REPLACE_PUNCT = {'-lrb-': '(', '-rrb-': ')', '-lsb-': '[', '-rsb-': ']', '#': '$'}
-NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m', '\'ve', '\'d', '?', '!', 'n\'t', '\'re', '\'']
-NO_TRAILING_SPACE_PUNCT = [' `']#, ' \'']
-
-
-def detokenize_sent(sent):
-    """ Detokenize sents for readability, including:
-
-    - capitalizing first word of sentence (missing for proper nouns for English)
-    - remove extra spaces
-    - swap -lrb- and -rrb- for [, ] respectively
-    """
-    sent = sent.capitalize()
-    for k, v in REPLACE_PUNCT.items():
-        sent = sent.replace(k, v)
-    for punct in NO_LEADING_SPACE_PUNCT:
-        sent = sent.replace(f' {punct}', punct)
-    for punct in NO_TRAILING_SPACE_PUNCT:
-        sent = sent.replace(f'{punct} ', punct)
-    return sent
 
 
 def align_summaries():
@@ -347,6 +401,69 @@ def align_summaries():
         print("\tFinished writing data")
 
     return
+
+
+def format_multiqa_data():
+    """ Take QA data in a MultiQA format and output in fairseq format """
+
+    def process_text(text):
+        return " ".join(text.replace("\n", " ").split())
+
+    out_dir = '/private/home/wangalexc/data/multiqa'
+    data_files = {
+                  'squadv2': {'train': '/private/home/wangalexc/data/multiqa/multiqa_format/SQuAD2-0_train.jsonl',
+                              'dev': '/private/home/wangalexc/data/multiqa/multiqa_format/SQuAD2-0_train.jsonl',
+                              'test': '/private/home/wangalexc/data/multiqa/multiqa_format/SQuAD2-0_train.jsonl'},
+                  'newsqa': {'train': '/private/home/wangalexc/data/multiqa/multiqa_format/NewsQA_train.jsonl',
+                             'dev': '/private/home/wangalexc/data/multiqa/multiqa_format/NewsQA_dev.jsonl',
+                             'test': '/private/home/wangalexc/data/multiqa/multiqa_format/NewsQA_dev.jsonl'},
+                 }
+
+    task = 'squadv2'
+    data = data_files[task]
+    use_ans = 0
+    SPECIAL_TOK = "[ANS]"
+    NO_ANS_TOK = "[NO_ANS]"
+    for split, data_file in data.items():
+        if split == 'out':
+            continue
+        srcs, trgs = list(), list()
+        split_data = [json.loads(l) for l in open(data_file, encoding="utf-8")][1:] # header
+        for datum in split_data:
+            ctx = process_text(datum['context']['documents'][0]['text'])
+            qas = datum['qas']
+            for qa in qas:
+                qst = process_text(qa['question'])
+                ans_item = qa['answers']['open-ended']
+                if 'cannot_answer' in ans_item and ans_item['cannot_answer'] == 'yes':
+                    ans = NO_ANS_TOK
+                else:
+                    ans = process_text(ans_item['annotators_answer_candidates'][0]['single_answer']['extractive']['answer'])
+
+                if use_ans:
+                    srcs.append(f"{ctx} {SPECIAL_TOK} {ans}")
+                else:
+                    srcs.append(ctx)
+                trgs.append(qst)
+
+        if use_ans:
+            src_out_file = os.path.join(out_dir, f'{task}_w_ans.{split}.src.txt')
+            trg_out_file = os.path.join(out_dir, f'{task}_w_ans.{split}.trg.txt')
+        else:
+            src_out_file = os.path.join(out_dir, f'{task}.{split}.src.txt')
+            trg_out_file = os.path.join(out_dir, f'{task}.{split}.trg.txt')
+
+        with open(src_out_file, 'w') as out_fh:
+            for src in srcs:
+                out_fh.write(f'{src}\n')
+
+        with open(trg_out_file, 'w') as out_fh:
+             for trg in trgs:
+                out_fh.write(f'{trg}\n')
+
+        print(f"Finished extracting {split} split for {task}")
+
+
 
 
 def prepare_parlai_data():
@@ -735,6 +852,29 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
     compute_fleiss(odd_kappas)
 
 
+def inspect_qas(src_inp_file, gen_inp_file,
+                src_out_file, gen_out_file):
+    """ Inspect QA inputs and outputs
+    """
+
+    qstgen_ctxsrc = json.load(open(src_inp_file))["data"]
+    qstgen_ctxgen = json.load(open(gen_inp_file))["data"]
+    anssrc = json.load(open(src_out_file))
+    ansgen = json.load(open(gen_out_file))
+
+    def inspect(idx):
+        print(f"src: {qstgen_ctxsrc[idx]['paragraphs'][0]['context']}")
+        print(f"gen: {qstgen_ctxgen[idx]['paragraphs'][0]['context']}")
+        print(f"QAs: ")
+        for qa_idx, qa in enumerate(qstgen_ctxgen[idx]['paragraphs'][0]['qas']):
+            print(f"\tqst: {qa['question']}")
+            print(f"\tsrc ans: {anssrc[str(n_qsts_per_doc * idx + qa_idx)]}")
+            print(f"\tgen ans: {ansgen[str(n_qsts_per_doc * idx + qa_idx)]}")
+            print()
+
+    ipdb.set_trace()
+
+
 
 def mturk_posthoc(is_sandbox=False):
     """Currently: analyze time
@@ -864,8 +1004,10 @@ elif exp_name == "subset1000":
 elif exp_name == "xsum-subset1000":
     exp_d = xsum_subset1000_data
     n_qsts_per_doc = 6
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-src.xsum-gen.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-gen.json"
+    src_inp_file = f"data/xsum/random1000/qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
+    trg_inp_file = f'data/xsum/random1000/qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json'
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json"
 else:
     exp_d = subset100_data
     n_qsts_per_doc = 10
@@ -877,23 +1019,29 @@ else:
 
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
-#aggregate_questions()
-
+#aggregate_questions_from_fseq_log()
+#aggregate_questions_from_txt()
 
 #extract_subset()
 #align_summaries()
+#format_multiqa_data()
 #prepare_parlai_data()
 
 
 
-compute_correlations_with_human(turk_files=exp_d[mdl],
-                                ref_file=exp_d["ref"],
-                                hyp_file=exp_d["hyp"][mdl],
-                                mdl=mdl,
-                                qags_src_file=qags_src_file,
-                                qags_trg_file=qags_trg_file,
-                                n_qsts_per_doc=n_qsts_per_doc
-                                )
+#compute_correlations_with_human(turk_files=exp_d[mdl],
+#                                ref_file=exp_d["ref"],
+#                                hyp_file=exp_d["hyp"][mdl],
+#                                mdl=mdl,
+#                                qags_src_file=qags_src_file,
+#                                qags_trg_file=qags_trg_file,
+#                                n_qsts_per_doc=n_qsts_per_doc
+#                                )
 
+
+inspect_qas(src_inp_file=src_inp_file,
+            gen_inp_file=trg_inp_file,
+            src_out_file=qags_src_file,
+            gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
