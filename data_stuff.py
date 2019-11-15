@@ -838,12 +838,19 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
     n_hits, n_rejected_hits, n_total_hits = 0, 0, 0
     idxs = list()
     idx2responses = defaultdict(lambda: defaultdict(list))
+    idx2data = dict()
     for turk_file in turk_files:
         mturk_data = [ast.literal_eval(l) for l in open(turk_file, encoding="utf-8")]
         for datum in mturk_data:
+            n_total_hits += 1
+            assert len(datum['worker_data']) == 1, ipdb.set_trace()
+
+            if 'did_fail' in datum and datum['did_fail']:
+                n_rejected_hits += 1
+                continue
+
             for worker_id, worker in datum['worker_data'].items():
 
-                n_total_hits += 1
                 # Filter out bad reponses
                 bad_resp_flag, short_msg_flag, attn_fail_flag = 0, 0, 0
                 ## filter out returns and discounnects
@@ -872,21 +879,12 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
                 resps = [d["speakerChoice"] for d in worker['response']['task_data']]
                 for sent_idx, resp in zip(sent_idxs, resps):
                     idx2responses[para_idx][sent_idx].append(resp_map[resp])
+                idx2data[para_idx] = worker['task_data'][0]['conversations'][0]['dialog'][0]['text']
+                for task in worker['task_data']:
+                    sent_idx = task['conversations'][1]['ex_idx'][2]
+                    idx2data[(para_idx, sent_idx)] = task['conversations'][1]['dialog'][0]['text']
                 idxs.append(para_idx)
-
     idxs = list(set(idxs))
-
-
-    def print_response(par_idx):
-        src_key = ('src', par_idx, -1)
-        n_trgs = len(idx2responses[src_key])
-        print(f"Paragraph {par_idx}")
-        print(f"\t{idx2data[src_key]}")
-        #for i in range(n_trgs):
-        for trg_key in idx2responses[src_key].keys():
-            #trg_key = (mdl, par_idx, i)
-            print(f"\t{idx2responses[src_key][trg_key]}: {idx2data[trg_key]}")
-
 
     # Aggregate stuff
     n_tasks = 0 # n article-sentence pairs
@@ -907,8 +905,6 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
             if sent_idx in ATTN_IDXS:
                 continue
             assert votes, "No votes!"
-            #votes = random.sample(votes, 3) if len(votes) > 3 else votes
-            votes = votes[:3]
             votes0 = votes.count(0)
             votes1 = votes.count(1)
             if votes1 >= votes0:
@@ -955,6 +951,13 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         print(f"\t{v} tasks with {k} responses")
     print()
 
+    def print_response(par_idx):
+        print(f"Paragraph {par_idx}")
+        print(f"\t{idx2data[par_idx]}")
+        for sent_idx in idx2responses[par_idx].keys():
+            if sent_idx in ATTN_IDXS:
+                continue
+            print(f"\t{idx2responses[par_idx][sent_idx]}: {idx2data[(par_idx, sent_idx)]}")
 
     def compute_fleiss(resps):
         """ Janky because we don't really have three annotators """

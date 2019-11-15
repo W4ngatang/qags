@@ -1,6 +1,8 @@
 """ Run precision mturk task """
 
+import math
 from datetime import datetime
+import ipdb
 
 from main import main as run_main, make_flags
 from config import task_config
@@ -15,9 +17,9 @@ def set_args():
 
     args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/summary'
     #args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/xsum'
-    shard_n = 0
+    shard_n = 5
     args['model_comparisons'] = [
-                                 (f'src_para_nex5_randorder_shard{shard_n}', f'bart_sent_nex5_randorder_shard{shard_n}'),
+                                 #(f'src_para_nex5_randorder_shard{shard_n}', f'bart_sent_nex5_randorder_shard{shard_n}'),
                                  #(f'src_para_nex5_randorder_shard{shard_n}', f'bus_sent_nex5_randorder_shard{shard_n}'),
 
                                  #('src_para_short', 'bus_sent_short'),
@@ -40,7 +42,7 @@ def set_args():
                                  #(f'src_para_nex500_ref_order_shard{shard_n}', f'pgc_sent_nex500_ref_order_shard{shard_n}'),
                                  #(f'src_para_nex500_ref_order_shard{shard_n}', f'trg_sent_nex500_ref_order_shard{shard_n}'),
 
-                                 #(f'src_para_nex1000_randorder_shard{shard_n}', f'bus_sent_nex1000_randorder_shard{shard_n}'),
+                                 (f'src_para_nex1000_randorder_shard{shard_n}', f'bus_sent_nex1000_randorder_shard{shard_n}'),
                                  #(f'src_para_nex1000_randorder_shard{shard_n}', f'fas_sent_nex1000_randorder_shard{shard_n}'),
                                  #(f'src_para_nex1000_randorder_shard{shard_n}', f'pgc_sent_nex1000_randorder_shard{shard_n}'),
                                  #(f'src_para_nex1000_randorder_shard{shard_n}', f'trg_sent_nex1000_randorder_shard{shard_n}'),
@@ -51,11 +53,11 @@ def set_args():
                                  #(f'src_para_nex100_randorder_shard{shard_n}', f'trg_sent_nex100_randorder_shard{shard_n}'),
 
                                 ]
-    args['pairs_per_matchup'] = 5
-    args['annotations_per_pair'] = 1
+    args['pairs_per_matchup'] = 50
+    args['annotations_per_pair'] = 3
 
     # TODO(Alex): CHANGE ME!!!
-    args['is_sandbox'] = False
+    args['is_sandbox'] = True
     args['qual_percent_hits_approved'] = 98
     args['qual_n_hits_approved'] = 1000
     args['min_time_threshold'] = 30
@@ -89,9 +91,10 @@ def set_args():
     # Manager workers by creating HITS until num_conversations is reached, including
     # onboarding tasks
     #args['num_conversations'] = 10 + (len(args['model_comparisons']) * args['pairs_per_matchup'] * args['annotations_per_pair'])
-    args['num_conversations'] = len(args['model_comparisons']) * args['pairs_per_matchup'] * args['annotations_per_pair']
+    args['num_conversations'] = math.ceil((len(args['model_comparisons']) * args['pairs_per_matchup'] * args['annotations_per_pair']) * 1.33)
     args['assignment_duration_in_seconds'] = 1800
-    args['reward'] = 1.00 # in dollars
+    args['reward'] = 0.15 # in dollars
+    args['bonus_reward'] = 0.85 # in dollars
     args['max_hits_per_worker'] = 100
 
     # Additional args that can be set - here we show the default values.
