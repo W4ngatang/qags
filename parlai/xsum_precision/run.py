@@ -15,9 +15,10 @@ def set_args():
     out_file = f"mturk_data.{curr_time.strftime('%m%d%H%M')}.jsonl"
     args['out_file'] = f'/home/awang/projects/qags/data/mturk/xsum/precision/{out_file}'
     args['bad_worker_file'] = f'/home/awang/projects/qags/data/mturk/bad_workers.txt'
-    args['bonus_file'] = f'/home/awang/projects/qags/data/mturk/bonuses_awarded.csv'
+    #args['bonus_file'] = f'/home/awang/projects/qags/data/mturk/bonuses_awarded.csv'
+    args['bonus_file'] = f'/home/awang/projects/qags/data/mturk/bonuses_to_award.csv'
     args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/xsum'
-    shard_n = 1
+    shard_n = 2
     args['model_comparisons'] = [
                                  #(f'src_para_nex5_randorder_shard{shard_n}', f'bart_sent_nex5_randorder_shard{shard_n}'),
                                  #(f'src_para_nex10_randorder_shard{shard_n}', f'bart_sent_nex10_randorder_shard{shard_n}'),

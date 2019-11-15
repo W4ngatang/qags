@@ -442,7 +442,10 @@ class TaskDescription extends React.Component {
         <div style={speaker1_style}>article</div> on the left and a series of&nbsp;
         <div style={speaker2_style}>sentences</div> on the right.
         The task is to determine if the sentences are factually correct given the contents of the article.&nbsp;
-        <b>All parts of the sentence must be stated or implied by the article to be considered correct.</b>&nbsp;
+        <b>All parts of the sentence must be stated or reasonably implied by the article to be considered correct.</b>&nbsp;
+        For example, if the <div style={speaker2_style}>sentence</div> discusses "John Smith" but the <div style={speaker1_style}>article</div> only talks about "Mr. Smith", the fact that the person's first name is John is NOT supported.&nbsp;
+        Or, if the <div style={speaker2_style}>sentence</div> mentions a 15-year-old girl but the <div style={speaker1_style}>article</div> only discusses a young girl, the fact that she is 15 is NOT supported.&nbsp;
+        <b>Verifying a sentence will often require combining facts from many different parts of the article, so read the entire article closely.</b>&nbsp;
         If the sentence directly copies the article, you should mark it as supported.&nbsp;
         If the sentence doesn't make sense, you should mark it as not supported.&nbsp;
         <br/><br/>
@@ -454,8 +457,7 @@ class TaskDescription extends React.Component {
         You will be presented with multiple sentences, one at a time.&nbsp;
         After you've made your selection, a [NEXT] button will appear on the left.&nbsp;
         <b>Use the [NEXT] button to navigate to the next sentence in the task.</b>&nbsp;
-        <b>NOTE: Please be sure to only accept one of this task at a time.</b>&nbsp;
-        Additional pages will show errors or fail to load and you wll not be able to submit the HIT.&nbsp;
+        Please be sure to only accept one of this task at a time, or else additional pages will show errors and you wll not be able to submit the HIT.&nbsp;
         <br/><br/>
 
       </div>
@@ -480,6 +482,9 @@ class TaskDescription extends React.Component {
           <br/><br/>
           The task is to determine if the sentences are factually correct given the contents of the article.&nbsp;
           <b>All parts of the sentence must be stated or implied by the article to be considered correct.</b>&nbsp;
+          For example, if the <div style={speaker2_style}>sentence</div> discusses "John Smith" but the <div style={speaker1_style}>article</div> only talks about "Mr. Smith", the fact that the person's first name is John is NOT supported.&nbsp;
+          Or, if the <div style={speaker2_style}>sentence</div> mentions a 15-year-old girl but the <div style={speaker1_style}>article</div> only discusses a young girl, the fact that she is 15 is NOT supported.&nbsp;
+          <b>Verifying a sentence will often require combining facts from many different parts of the article, so read the entire article closely.</b>&nbsp;
           If the sentence directly copies the article, you should mark it as supported.&nbsp;
           If the sentence doesn't make sense, you should mark it as not supported.&nbsp;
           <br/><br/>

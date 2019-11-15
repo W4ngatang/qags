@@ -129,12 +129,14 @@ def evaluate(tgts, prds, n_qsts_per_doc, metric_name="em"):
         mean *= 100.
         std *= 100.
 
-    return scores.tolist(), mean, std, good_exs, bad_exs
+    return scores.tolist(), good_exs, bad_exs
+
 
 def load_data(data_file):
     """ """
     data = json.load(open(data_file, encoding="utf-8"))
     return data
+
 
 def align_ans(srcs, trgs):
     """ """
@@ -146,6 +148,7 @@ def align_ans(srcs, trgs):
 
 def count_noans(src_anss, trg_anss):
     """ """
+    n_src, n_trg = len(src_anss), len(trg_anss)
     src_unans, trg_unans, both_unans = 0, 0, 0
     for src_ans, trg_ans in zip(src_anss, trg_anss):
         if src_ans == "" and trg_ans == "":
@@ -154,10 +157,12 @@ def count_noans(src_anss, trg_anss):
             src_unans += 1
         if trg_ans == "":
             trg_unans += 1
-    print(f"Source no answer: {src_unans} / {len(src_anss)}")
-    print(f"Target no answer: {trg_unans} / {len(trg_anss)}")
-    print(f"Both no answer: {both_unans}")
-
+    percent_src_noans = src_unans / n_src
+    percent_trg_noans = trg_unans / n_trg
+    print(f"% source no answer: {percent_src_noans} ({src_unans} / {n_src}) ")
+    print(f"% target no answer: {percent_trg_noans} ({trg_unans} / {n_trg}) ")
+    print(f"# both no answer: {both_unans}")
+    return percent_src_noans, percent_trg_noans, both_unans
 
 def load_correctness(data_file):
     """ Load file with correctness labels per summary
@@ -180,10 +185,10 @@ def main(arguments):
     src_ans, trg_ans = align_ans(srcs, trgs)
     count_noans(src_ans, trg_ans)
     for metric in ['em', 'f1', 'ed']:
-        scores, tgt_mean, tgt_std, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans,
-                                                                metric_name=metric,
-                                                                n_qsts_per_doc=args.n_qsts_per_doc)
-        print(f"Tgt {metric}: mean {tgt_mean}, std {tgt_std}")
+        scores, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans,
+                                             metric_name=metric,
+                                             n_qsts_per_doc=args.n_qsts_per_doc)
+        print(f"Tgt {metric}: mean {np.mean(scores)}, std {np.std(scores)}")
         if args.outdir is not None:
             json.dump(scores, open(os.path.join(args.outdir, f"{metric}_scores.json"), "w"))
 

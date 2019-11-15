@@ -112,6 +112,9 @@ def main():
     parser.add_argument("--do_lower_case",
                         action='store_true',
                         help="Whether to lower case the input text. True for uncased models, False for cased models.")
+    parser.add_argument("--distributed",
+                        action='store_true',
+                        help="Whether to do distributed training.")
     parser.add_argument("--local_rank",
                         type=int,
                         default=-1,
@@ -157,15 +160,16 @@ def main():
         torch.cuda.set_device(args.local_rank)
         device = torch.device("cuda", args.local_rank)
         n_gpu = 1
-        # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.distributed.init_process_group(backend='nccl')
+        if args.distributed:
+            # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+            torch.distributed.init_process_group(backend='nccl')
 
     #logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
     #                    datefmt = '%m/%d/%Y %H:%M:%S',
     #                    level = logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
 
     logger.info("device: {} n_gpu: {}, distributed training: {}, 16-bits training: {}".format(
-        device, n_gpu, bool(args.local_rank != -1), args.fp16))
+        device, n_gpu, bool(args.distributed), args.fp16))
 
     if args.gradient_accumulation_steps < 1:
         raise ValueError("Invalid gradient_accumulation_steps parameter: {}, should be >= 1".format(
@@ -196,17 +200,17 @@ def main():
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    if args.local_rank not in [-1, 0]:
+    if args.distributed and args.local_rank not in [-1, 0]:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
     model = BertForQuestionAnswering.from_pretrained(args.bert_model)
-    if args.local_rank == 0:
+    if args.distributed and args.local_rank == 0:
         torch.distributed.barrier()
 
     if args.fp16:
         model.half()
     model.to(device)
-    if args.local_rank != -1:
+    if args.distributed and args.local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(model,
                                                           device_ids=[args.local_rank],
                                                           output_device=args.local_rank,
@@ -215,7 +219,7 @@ def main():
         model = torch.nn.DataParallel(model)
 
     if args.do_train:
-        if args.local_rank in [-1, 0]:
+        if args.distributed and args.local_rank in [-1, 0]:
             tb_writer = SummaryWriter()
         # Prepare data loader
         train_examples = read_squad_examples(
@@ -233,7 +237,7 @@ def main():
                 doc_stride=args.doc_stride,
                 max_query_length=args.max_query_length,
                 is_training=True)
-            if args.local_rank == -1 or torch.distributed.get_rank() == 0:
+            if args.local_rank == -1 or torch.distributed.get_rank() == 0 or not args.distributed:
                 logger.info("  Saving train features into cached file %s", cached_train_features_file)
                 with open(cached_train_features_file, "wb") as writer:
                     pickle.dump(train_features, writer)
@@ -245,7 +249,7 @@ def main():
         all_end_positions = torch.tensor([f.end_position for f in train_features], dtype=torch.long)
         train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids,
                                    all_start_positions, all_end_positions)
-        if args.local_rank == -1:
+        if args.local_rank == -1 or not args.distributed:
             train_sampler = RandomSampler(train_data)
         else:
             train_sampler = DistributedSampler(train_data)
@@ -301,7 +305,7 @@ def main():
 
         model.train()
         for epoch in trange(int(args.num_train_epochs), desc="Epoch"):
-            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])):
+            for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration", disable=(args.distributed and args.local_rank not in [-1, 0]))):
                 if n_gpu == 1:
                     batch = tuple(t.to(device) for t in batch) # multi-gpu does scattering it-self
                 input_ids, input_mask, segment_ids, start_positions, end_positions = batch
@@ -325,11 +329,11 @@ def main():
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
-                    if args.local_rank in [-1, 0]:
+                    if not arg.distributed or args.local_rank in [-1, 0]:
                         tb_writer.add_scalar('lr', optimizer.get_lr()[0], global_step)
                         tb_writer.add_scalar('loss', loss.item(), global_step)
 
-    if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+    if args.do_train and (not args.distributed or args.local_rank == -1 or torch.distributed.get_rank() == 0):
         # Save a trained model, configuration and tokenizer
         model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
 
@@ -359,7 +363,7 @@ def main():
         tokenizer = BertTokenizer.from_pretrained(args.load_model_from_dir, do_lower_case=args.do_lower_case)
     model.to(device)
 
-    if args.do_predict and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+    if args.do_predict and (not args.distributed or args.local_rank == -1 or torch.distributed.get_rank() == 0):
         eval_examples = read_squad_examples(
             input_file=args.predict_file, is_training=False, version_2_with_negative=args.version_2_with_negative)
         eval_features = convert_examples_to_features(
@@ -387,7 +391,7 @@ def main():
         model.eval()
         all_results = []
         logger.info("Start evaluating")
-        for input_ids, input_mask, segment_ids, example_indices in tqdm(eval_dataloader, desc="Evaluating", disable=args.local_rank not in [-1, 0]):
+        for input_ids, input_mask, segment_ids, example_indices in tqdm(eval_dataloader, desc="Evaluating", disable=(args.distributed and args.local_rank not in [-1, 0])):
             if len(all_results) % 1000 == 0:
                 logger.info("Processing example: %d" % (len(all_results)))
             input_ids = input_ids.to(device)

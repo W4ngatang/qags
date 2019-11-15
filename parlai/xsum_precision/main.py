@@ -571,14 +571,14 @@ def check_work(mturk_manager, data_handler, save_data,
             # pay out bonus
             curr_time = datetime.now()
             request_tok = f"{worker_id}-{curr_time.strftime('%m%d%H%M')}"
-            mturk_manager.pay_bonus(worker_id=worker_id,
-                                    bonus_amount=bonus_amount,
-                                    assignment_id=asgn_id,
-                                    reason=BONUS_MSG,
-                                    unique_request_token=request_tok)
+            #mturk_manager.pay_bonus(worker_id=worker_id,
+            #                        bonus_amount=bonus_amount,
+            #                        assignment_id=asgn_id,
+            #                        reason=BONUS_MSG,
+            #                        unique_request_token=request_tok)
             if bonus_fh is not None:
                 bonus_fh.write(f"{worker_id},{asgn_id},{request_tok},{bonus_amount}\n")
-            print(f"\tPaid ${bonus_amount} to {worker_id}")
+            print(f"\tWould pay ${bonus_amount} to {worker_id}")
 
     # onboarding tasks
     elif (num_correct / num_onboarding_tasks) >= threshold and not short_msg_flag:
@@ -663,7 +663,7 @@ def main(opt, task_config):
     print(f"Qualifications: {qualifications}")
 
     out_fh = open(opt['out_file'], 'w')
-    if opt['bad_worker_file'] is not None:
+    if opt['bad_worker_file'] is not None and not opt['is_sandbox']:
         print(f"Logging bad workers in {opt['bad_worker_file']}.")
         if os.path.exists(opt['bad_worker_file']):
             with open(opt['bad_worker_file'], 'r') as bad_worker_fh:
@@ -681,10 +681,13 @@ def main(opt, task_config):
         mturk_manager.start_new_run()
 
         # (Soft) block bad workers
-        if opt['bad_worker_file'] is not None:
+        if opt['bad_worker_file'] is not None and not opt['is_sandbox']:
             for worker_id in workers_to_block:
-                mturk_manager.soft_block_worker(worker_id)
-                blocked_workers.append(worker_id)
+                try:
+                    mturk_manager.soft_block_worker(worker_id)
+                    blocked_workers.append(worker_id)
+                except:
+                    print(f"Failed to block {worker_id}")
             mturk_manager.un_soft_block_worker(ALEX_ID)
 
 
@@ -760,7 +763,7 @@ def main(opt, task_config):
 
         # Close file handles
         out_fh.close()
-        if opt['bad_worker_file'] is not None:
+        if opt['bad_worker_file'] is not None and not opt['is_sandbox']:
             bad_worker_fh.close()
         if opt['bonus_file'] is not None:
             bonus_fh.close()

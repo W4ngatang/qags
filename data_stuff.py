@@ -9,6 +9,7 @@ import copy
 import random
 import itertools
 from datetime import datetime
+from functools import lru_cache
 from collections import defaultdict, Counter
 
 import ipdb
@@ -18,17 +19,20 @@ import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 from nltk.tokenize import sent_tokenize
 from nltk import agreement
+import spacy
 #from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
 
 from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
                   filter_line_fseq, parse_generation, \
                   load_txt, load_json
-from eval_ppb_answers import evaluate, load_data, align_ans
+from eval_ppb_answers import evaluate, load_data, align_ans, count_noans
 
 N_SAMPLES = 5
 ATTN_IDXS = [-2, -3]
 MTURK_BAD_RESPONSES = ['[DISCONNECT]', '[RETURNED]']
+ANS_TOK = "[ANS]"
+NO_ANS_TOK = "[NO_ANS]"
 
 JOIN_PUNCT = {'- lrb -': '-lrb-', '- rrb -': '-rrb-',
               'n \' t ': 'n\'t ', '\' s ': '\'s ', ' \' ve ': '\'ve ',
@@ -38,6 +42,20 @@ JOIN_PUNCT = {'- lrb -': '-lrb-', '- rrb -': '-rrb-',
 REPLACE_PUNCT = {'-lrb-': '(', '-rrb-': ')', '-lsb-': '[', '-rsb-': ']', '#': '$'}
 NO_LEADING_SPACE_PUNCT = ['.', ',', '\'s', '\'m', '\'ve', '\'d', '?', '!', 'n\'t', '\'re', '\'']
 NO_TRAILING_SPACE_PUNCT = [' `']#, ' \'']
+
+
+import socket
+hostname = socket.gethostname()
+if 'nyu' in hostname:
+    PROJ_DIR = '/home/awang/projects/qags'
+    CKPT_DIR = '/misc/vlgscratch4/BowmanGroup/awang/ckpts'
+    DATA_DIR = '/misc/vlgscratch4/BowmanGroup/awang/processed_data'
+elif 'fair' in hostname:
+    PROJ_DIR = '/private/home/wangalexc/projects/qags'
+    CKPT_DIR = '/checkpoint/wangalexc'
+    DATA_DIR = '/private/home/wangalexc/data'
+else:
+    raise ValueError(f"Unknown hostname {hostname} detected! Paths are probably set wrong.")
 
 
 def detokenize_sent(sent):
@@ -57,24 +75,74 @@ def detokenize_sent(sent):
     return sent
 
 
-def filter_qsts(qsts, n_qsts):
+def filter_qsts(qsts, probs, anss, n_qsts):
     """ Filter out questions by a number of criteria
+    - repetitions: exact repetitions
+    - length: short sentences are excluded
 
-    - repetitions: exact repetitions, high ngram overlap
-    - weird grammatical quirks: text after question marks
+    If anss is nonempty, then this function expects that
+        len(qsts) % len(ans) == 0 and that the questions
+        are grouped by the answer.
 
     """
-    return qsts[:n_qsts]
 
-def get_qags_scores(src_ans_file, trg_ans_file, metric_name="em", n_qsts_per_doc=10):
+    qsts_and_probs = sorted(zip(qsts, probs), key=lambda x: x[1])
+    clean_qsts = list()
+    clean_probs = list()
+    for qst, prob in qsts_and_probs:
+        tok_qst = qst.split() # might not be standalone token
+        try:
+            #qst_idx = tok_qst.index('?') # get idx of *first* '?'
+            qst_idx = qst.index('?') # get idx of *first* '?'
+            # filter out stuff after '?'
+            clean_qst = qst[:qst_idx + 1]
+            clean_toks = clean_qst.split()
+            if clean_qst in clean_qsts or len(clean_toks) < 3:
+                continue
+            clean_qsts.append(clean_qst)
+            clean_probs.append(prob)
+        except ValueError as e: # no '?' mark
+            continue
+
+    n_clean_qsts = len(clean_qsts)
+    if n_clean_qsts < n_qsts:
+        print("Too few questions!")
+        supp_qsts = random.sample(qsts, n_qsts - n_clean_qsts)
+        clean_qsts.append(supp_qsts)
+
+    return clean_qsts[:n_qsts], n_clean_qsts
+
+
+@lru_cache(maxsize=512)
+def get_spacy_nlp(model="en_trf_robertabase_lg"):
+    nlp = spacy.load(model)
+    return nlp
+
+def extract_ans(txts):
+    """ extract entities from a sentence using spacy
+    """
+    nlp = get_spacy_nlp("en_core_web_lg")
+    all_ans = list()
+    for doc in nlp.pipe(txts, disable=[]):
+        ans = list()
+        for ent in doc.ents:
+            ans.append(ent.text)
+        for noun in doc.noun_chunks:
+            ans.append(noun.text)
+        all_ans.append(list(set(ans)))
+    return all_ans
+
+
+def get_qags_scores(src_ans_file, trg_ans_file,
+                    metric_name="em", n_qsts_per_doc=10):
     """Load answer files and compute similarity scores
     """
     srcs = load_data(src_ans_file)
     trgs = load_data(trg_ans_file)
     src_ans, trg_ans = align_ans(srcs, trgs)
-    qags_scores, _, _, _, _ = evaluate(tgts=src_ans, prds=trg_ans,
-                                       n_qsts_per_doc=n_qsts_per_doc,
-                                       metric_name=metric_name)
+    qags_scores, _,  _ = evaluate(tgts=src_ans, prds=trg_ans,
+                                  n_qsts_per_doc=n_qsts_per_doc,
+                                  metric_name=metric_name)
     return qags_scores
 
 
@@ -93,17 +161,21 @@ def get_rouge_scores(hyps, refs):
                              weight_factor=1.2,
                              stemming=True)
     rouge_d = rouge_eval.get_scores(hyps, refs)
-    rouge_scores = [[] for _ in range(len(hyps))]
-    for metric_name, metric_d in rouge_d.items():
-        for ex_idx, ex_metrics in enumerate(metric_d):
-            rouge_scores[ex_idx].append(ex_metrics['f'][0])
-    rouge_scores = [sum(l) / len(rouge_d) for l in rouge_scores]
-    return rouge_scores
+    rouge_avgs = {k: [vv['f'][0] for vv in v] for k, v in rouge_d.items()}
+    #rouge_scores = [[] for _ in range(len(hyps))]
+    #for metric_name, metric_d in rouge_d.items():
+    #    for ex_idx, ex_metrics in enumerate(metric_d):
+    #        rouge_scores[ex_idx].append(ex_metrics['f'][0])
+    #ipdb.set_trace()
+    #rouge_scores = [sum(l) / len(rouge_d) for l in rouge_scores]
+    #return rouge_scores
+    return rouge_avgs
 
 
 def get_lens(txts):
     """ """
     return [len(txt.split()) for txt in txts]
+
 
 def extract_src_trg_gen_from_fseq_log():
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
@@ -171,52 +243,107 @@ def extract_subset():
     print(f"Done!")
 
 
-
 def aggregate_questions_from_txt():
     """ Extract questions generated from src, trg, and gen
     with the corresponding field from fseq logs (one log/txt) and write to jsonl.
     Each fseq log should have the txt field as 'source' (S)
     and the questions as generated 'hypotheses' (H) """
 
+    data = 'xsum'
     n_exs = 1000
-    n_gen_qsts = 50 # n questions generated per doc
-    n_qsts = 10
-    src_txt_file = f"/private/home/wangalexc/data/xsum/random{n_exs}/src2bart/raw/test.src"
-    gen_txt_file = f"/private/home/wangalexc/data/xsum/random{n_exs}/bart2src/raw/test.src"
-    src_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/src2bart/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
-    gen_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/bart2src/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
-    out_dir = f"/private/home/wangalexc/projects/qags/data/xsum/random{n_exs}"
+    n_ans = 5
+    dataset = f'{data}-random{n_exs}'
+    if n_ans > 0:
+        dataset = f'{dataset}-{n_ans}ans'
+        src_txt_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.src.10251125.random1000.txt"
+        gen_txt_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.bart.10251125.random1000.txt"
+        src_ans_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.src_ans.10251125.random1000.txt"
+        gen_ans_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.bart_ans.10251125.random1000.txt"
+    else:
+        src_txt_file = f"{DATA_DIR}/xsum/random{n_exs}/src2bart/raw/test.src"
+        gen_txt_file = f"{DATA_DIR}/xsum/random{n_exs}/bart2src/raw/test.src"
 
+    n_qsts = 10 # n questions we actually want to use
+    qg_model = "qg-squad2-ans"
+    n_gen_qsts = 10 # n questions generated per doc
+    beam = 10
+    topk = 0
+    topp = 0
+    if topk > 0:
+        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
+        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
+        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
+        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
+    elif topp > 0:
+        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
+        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
+        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
+        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
+    else:
+        #src_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/src2bart/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
+        #gen_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/bart2src/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
+        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
+        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
+        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
+        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
+    out_dir = f"{PROJ_DIR}/data/xsum/random{n_exs}"
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
     files = {
-             "src": {"txt": src_txt_file, "qst": src_qst_file},
-             "gen": {"txt": gen_txt_file, "qst": gen_qst_file},
+             "src": {"txt": src_txt_file, "qst": src_qst_file, "probs": src_prob_file},
+             "gen": {"txt": gen_txt_file, "qst": gen_qst_file, "probs": gen_prob_file},
             }
+    if n_ans > 0:
+        out_dir = f"{out_dir}-{n_ans}ans"
+        n_gen_qsts *= n_ans
+        files["src"]["ans"] = src_ans_file
+        files["gen"]["ans"] = gen_ans_file
+    print(f"Reading data from {src_qst_file} and {gen_qst_file}, saving to {out_dir}")
 
     all_txts, all_qsts = {}, {}
     for txt_fld, field_files in files.items():
         txts = load_txt(field_files["txt"])
         qsts = load_txt(field_files["qst"])
+        probs = [float(f) for f in load_txt(field_files["probs"])]
+        if "ans" in field_files:
+            ans = load_txt(field_files["ans"])
+        else:
+            ans = list()
         all_txts[txt_fld] = txts
-        all_qsts[txt_fld] = qsts
+        all_qsts[txt_fld] = (qsts, probs, ans)
 
     # for each (question from a source x txt source) pair,
     # build the data then write out a SQuAD format file
+    min_clean_qsts = n_gen_qsts
+    min_clean_idxs = list()
     for txt_fld, qst_src in itertools.product(all_txts, all_qsts):
         txts = all_txts[txt_fld]
-        qsts = all_qsts[qst_src]
+        qsts, probs, anss = all_qsts[qst_src]
 
         raw_data = {}
         for i in range(n_exs):
-            txt = txts[i]
+            txt = txts[i * n_ans]
             cand_qsts = qsts[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
-            qst = [[q] for q in filter_qsts(cand_qsts, n_qsts=n_qsts)]
+            cand_probs = probs[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
+            cand_anss = anss[(i * n_ans): ((i + 1) * n_ans)] if anss else list()
+            clean_qsts, n_clean_qsts = filter_qsts(cand_qsts, cand_probs, cand_anss, n_qsts)
+            qst = [[q] for q in clean_qsts]
+            if n_clean_qsts <= min_clean_qsts:
+                min_clean_qsts = n_clean_qsts
+                if i not in min_clean_idxs:
+                    min_clean_idxs.append(i)
             raw_data[i] = {txt_fld: txt, "hypotheses": qst}
 
         data = format_squad(raw_data, context=txt_fld)
-        out_file = f"{out_dir}/qst{n_qsts}-{qst_src}.xsum_random1000-{txt_fld}.json"
-        if not os.path.exists(out_dir):
-            os.mkdir(out_dir)
+        if beam > 0:
+            out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
+        elif topk > 0:
+            out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topk{topk}.{dataset}-{txt_fld}.json"
+        elif topp > 0:
+            out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topp{topp}.{dataset}-{txt_fld}.json"
         json.dump(data, open(out_file, "w", encoding="utf-8"))
+    print(f"Min n clean questions: {min_clean_qsts}")
+    print(f"\tidxs: {min_clean_idxs}")
 
 
 def aggregate_questions_from_fseq_log():
@@ -403,7 +530,7 @@ def align_summaries():
     return
 
 
-def format_multiqa_data():
+def prepare_multiqa_data():
     """ Take QA data in a MultiQA format and output in fairseq format """
 
     def process_text(text):
@@ -422,8 +549,6 @@ def format_multiqa_data():
     task = 'squadv2'
     data = data_files[task]
     use_ans = 0
-    SPECIAL_TOK = "[ANS]"
-    NO_ANS_TOK = "[NO_ANS]"
     for split, data_file in data.items():
         if split == 'out':
             continue
@@ -441,7 +566,7 @@ def format_multiqa_data():
                     ans = process_text(ans_item['annotators_answer_candidates'][0]['single_answer']['extractive']['answer'])
 
                 if use_ans:
-                    srcs.append(f"{ctx} {SPECIAL_TOK} {ans}")
+                    srcs.append(f"{ctx} {ANS_TOK} {ans}")
                 else:
                     srcs.append(ctx)
                 trgs.append(qst)
@@ -464,6 +589,49 @@ def format_multiqa_data():
         print(f"Finished extracting {split} split for {task}")
 
 
+
+def prepare_ans_conditional_data():
+    """ Given a text file, extract possible answer candidates for each line.
+
+    Will generate CONST instances for each line in txt
+    """
+
+    n_ans_per_txt = 5 # at least 2 for an ANS and NO_ANS
+    data_file = f"{DATA_DIR}/xsum/random1000/xsum.test.src.10251125.random1000.txt"
+    out_file = f"{DATA_DIR}/xsum/random1000/xsum.test.src_w_{n_ans_per_txt}ans.bart.10251125.random1000.txt"
+    ans_out_file = f"{DATA_DIR}/xsum/random1000/xsum.test.src_{n_ans_per_txt}ans.bart.10251125.random1000.txt"
+    print(f"Preparing answer conditional question generation data for {data_file}")
+
+    all_txts = load_txt(data_file)
+    print("Extracting entities...")
+    all_anss = extract_ans(all_txts)
+    print("\tDone!")
+    print(f"\tMin ans count: {min(len(a) for a in all_anss)}")
+    print(f"\tMax ans count: {max(len(a) for a in all_anss)}")
+
+    #check = lambda i: print(f"txt: {all_txts[i]}; ans: {all_anss[i]}")
+    #ipdb.set_trace()
+
+    print("Writing...")
+    txts_w_ans = list()
+    all_ans = list()
+    for txt, anss in zip(all_txts, all_anss):
+        if len(anss) > n_ans_per_txt - 1:
+            anss = random.sample(anss, n_ans_per_txt - 1)
+        anss += [NO_ANS_TOK] * (n_ans_per_txt - len(anss))
+        assert NO_ANS_TOK in anss, ipdb.set_trace()
+        for ans in anss:
+            txts_w_ans.append(f"{txt} {ANS_TOK} {ans}")
+            all_ans.append(ans)
+
+    with open(out_file, 'w') as out_fh:
+        for txt in txts_w_ans:
+            out_fh.write(f'{txt}\n')
+    with open(ans_out_file, 'w') as out_fh:
+        for ans in all_ans:
+            out_fh.write(f'{ans}\n')
+    print("\tDone!")
+    print(f"\tWrote {len(txts_w_ans)} sentences to {out_file}")
 
 
 def prepare_parlai_data():
@@ -657,7 +825,6 @@ def prepare_parlai_data():
                         sent_fh.write(f"{json.dumps(sent_d)}\n")
 
 
-
 def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
                                     qags_src_file, qags_trg_file, n_qsts_per_doc):
     """ Compute sentence and system level correlations
@@ -730,7 +897,7 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
     odd_human_scores = list() # scores for summaries w/ 3 annotations
     odd_idxs = list() # idxs of summaries w/ 3 annotations
     n_responses = defaultdict(int) # n tasks w/ {1,2,3} responses
-    odd_kappas = defaultdict(lambda: defaultdict(list))
+    kappas3 = defaultdict(lambda: defaultdict(list))
     for para_idx in idxs:
         para_d = idx2responses[para_idx]
         agg_labels = []
@@ -740,7 +907,8 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
             if sent_idx in ATTN_IDXS:
                 continue
             assert votes, "No votes!"
-            #votes = votes[:3]
+            #votes = random.sample(votes, 3) if len(votes) > 3 else votes
+            votes = votes[:3]
             votes0 = votes.count(0)
             votes1 = votes.count(1)
             if votes1 >= votes0:
@@ -761,7 +929,8 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
                 odd_agg_labels.append(1 if votes1 > votes0 else 0)
                 if para_idx not in odd_idxs:
                     odd_idxs.append(para_idx)
-                odd_kappas[para_idx][sent_idx] = votes
+                if len(votes) == 3:
+                    kappas3[para_idx][sent_idx] = votes
             n_tasks += 1
             n_par_tasks += 1
 
@@ -805,7 +974,6 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         P = (np.sum(M * M, axis=1) - n_annotators) / (n_annotators * (n_annotators - 1))
         Pbar = np.sum(P) / N
         PbarE = np.sum(p * p)
-
         kappa = (Pbar - PbarE) / (1 - PbarE)
         print(f"Fleiss: {kappa}, n annotators {n_annotators}")
 
@@ -817,10 +985,15 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         refs = [all_refs[idx] for idx in idxs]
         hyps = [all_hyps[idx] for idx in idxs]
         rouge_scores = get_rouge_scores(hyps, refs)
-        pearson_corr = pearsonr(scores, rouge_scores)
-        spearman_corr = spearmanr(scores, rouge_scores)
-        print(f"pearson correlation w/ ROUGE: {pearson_corr}")
-        print(f"spearman correlation w/ ROUGE: {spearman_corr}")
+        rouge_vars = sorted(rouge_scores.keys())
+        #for var_name, var_scores in rouge_scores.items():
+        for var_name in rouge_vars:
+            var_scores = rouge_scores[var_name]
+            pearson_corr = pearsonr(scores, var_scores)
+            spearman_corr = spearmanr(scores, var_scores)
+            print(f"{var_name} mean: {np.mean(np.array(var_scores))}")
+            print(f"\tpearson correlation: {pearson_corr}")
+            print(f"\tspearman correlation: {spearman_corr}")
 
     def compute_qags_correlation(idxs, scores, metric_name):
         """Compute QAGS correlation with some scores
@@ -829,27 +1002,37 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         all_qags_scores = get_qags_scores(qags_src_file, qags_trg_file,
                                           metric_name=metric_name,
                                           n_qsts_per_doc=n_qsts_per_doc)
-        qags_scores = [all_qags_scores[idx] for idx in idxs]
+        qags_scores = np.array([all_qags_scores[idx] for idx in idxs])
         pearson_corr = pearsonr(scores, qags_scores)
         spearman_corr = spearmanr(scores, qags_scores)
-        print(f"pearson correlation w/ QAGS {metric_name}: {pearson_corr}")
-        print(f"spearman correlation w/ QAGS {metric_name}: {spearman_corr}")
+        print(f"QAGS {metric_name} mean: {np.mean(qags_scores)}")
+        print(f"\tpearson correlation: {pearson_corr}")
+        print(f"\tspearman correlation: {spearman_corr}")
 
 
     print(f"All examples")
-    compute_rouge_correlation(idxs, human_scores)
     if qags_src_file:
         compute_qags_correlation(idxs, human_scores, metric_name="em")
         compute_qags_correlation(idxs, human_scores, metric_name="f1")
-    compute_fleiss(idx2responses)
+    compute_rouge_correlation(idxs, human_scores)
+    #compute_fleiss(idx2responses)
     print()
 
     print(f"Examples with odd # labels ({len(odd_idxs)})")
-    compute_rouge_correlation(odd_idxs, odd_human_scores)
     if qags_src_file:
         compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="em")
         compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="f1")
-    compute_fleiss(odd_kappas)
+    compute_rouge_correlation(odd_idxs, odd_human_scores)
+    compute_fleiss(kappas3)
+    print()
+
+    if qags_src_file:
+        print(f"QA answer statistics")
+        srcs = load_data(qags_src_file)
+        trgs = load_data(qags_trg_file)
+        src_ans, trg_ans = align_ans(srcs, trgs)
+        count_noans(src_ans, trg_ans)
+        print()
 
 
 def inspect_qas(src_inp_file, gen_inp_file,
@@ -867,13 +1050,12 @@ def inspect_qas(src_inp_file, gen_inp_file,
         print(f"gen: {qstgen_ctxgen[idx]['paragraphs'][0]['context']}")
         print(f"QAs: ")
         for qa_idx, qa in enumerate(qstgen_ctxgen[idx]['paragraphs'][0]['qas']):
-            print(f"\tqst: {qa['question']}")
-            print(f"\tsrc ans: {anssrc[str(n_qsts_per_doc * idx + qa_idx)]}")
-            print(f"\tgen ans: {ansgen[str(n_qsts_per_doc * idx + qa_idx)]}")
+            print(f"qst: {qa['question']}")
+            print(f"src ans: {anssrc[str(n_qsts_per_doc * idx + qa_idx)]}")
+            print(f"gen ans: {ansgen[str(n_qsts_per_doc * idx + qa_idx)]}")
             print()
 
     ipdb.set_trace()
-
 
 
 def mturk_posthoc(is_sandbox=False):
@@ -903,7 +1085,6 @@ def mturk_posthoc(is_sandbox=False):
     print(f"min: {times.min()}")
     print(f"max: {times.max()}")
     ipdb.set_trace()
-
 
 
 
@@ -986,9 +1167,11 @@ xsum_subset1000_data = {
 }
 
 # Settings
-mdl = "bart"
-exp_name = "xsum-subset1000"
+mdl = "bus"
+exp_name = "subset1000"
 
+src_inp_file = ""
+trg_inp_file = ""
 if exp_name == "subset500":
     exp_d = subset500_data
     n_qsts_per_doc = 5
@@ -1001,19 +1184,26 @@ elif exp_name == "subset1000":
     qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
     qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
 
-elif exp_name == "xsum-subset1000":
-    exp_d = xsum_subset1000_data
-    n_qsts_per_doc = 6
-    src_inp_file = f"data/xsum/random1000/qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
-    trg_inp_file = f'data/xsum/random1000/qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json'
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json"
-else:
+elif exp_name == "subset100":
     exp_d = subset100_data
     n_qsts_per_doc = 10
     qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
     qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
 
+elif exp_name == "xsum-subset1000":
+    exp_d = xsum_subset1000_data
+    n_qsts_per_doc = 10 #6
+    src_inp_file = f"data/xsum/random1000-5ans/qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-5ans-src.json"
+    trg_inp_file = f'data/xsum/random1000-5ans/qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-5ans-gen.json'
+    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
+    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json"
+    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-src.json"
+    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-gen.json"
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-5ans/{mdl}/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-5ans-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-5ans/{mdl}/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-5ans-gen.json"
+
+else:
+    raise ValueError(f"Experiment name not found {exp_name}!")
 
 
 
@@ -1022,26 +1212,27 @@ else:
 #aggregate_questions_from_fseq_log()
 #aggregate_questions_from_txt()
 
+
 #extract_subset()
 #align_summaries()
-#format_multiqa_data()
+#prepare_multiqa_data()
+#prepare_ans_conditional_data()
 #prepare_parlai_data()
 
 
+compute_correlations_with_human(turk_files=exp_d[mdl],
+                                ref_file=exp_d["ref"],
+                                hyp_file=exp_d["hyp"][mdl],
+                                mdl=mdl,
+                                qags_src_file=qags_src_file,
+                                qags_trg_file=qags_trg_file,
+                                n_qsts_per_doc=n_qsts_per_doc
+                                )
 
-#compute_correlations_with_human(turk_files=exp_d[mdl],
-#                                ref_file=exp_d["ref"],
-#                                hyp_file=exp_d["hyp"][mdl],
-#                                mdl=mdl,
-#                                qags_src_file=qags_src_file,
-#                                qags_trg_file=qags_trg_file,
-#                                n_qsts_per_doc=n_qsts_per_doc
-#                                )
-
-
-inspect_qas(src_inp_file=src_inp_file,
-            gen_inp_file=trg_inp_file,
-            src_out_file=qags_src_file,
-            gen_out_file=qags_trg_file)
+#if src_inp_file and trg_inp_file:
+#    inspect_qas(src_inp_file=src_inp_file,
+#                gen_inp_file=trg_inp_file,
+#                src_out_file=qags_src_file,
+#                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
