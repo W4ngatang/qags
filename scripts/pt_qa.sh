@@ -135,9 +135,11 @@ function predict_extractive() {
     squad_version="v2_0"
     ckpt_dir="${ckpt_dir}/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}"
     qg_ckpt="best"
+    n_ans=10
     n_qsts=10
-    subset="random1000-5ans"
-    dataset="xsum-${subset}"
+    dataset="cnndm"
+    subset="random1000-${n_ans}ans"
+    tmp="${dataset}-${subset}"
     qg_model="qg-squad2-ans"
     beam=10
     topk=0
@@ -150,7 +152,7 @@ function predict_extractive() {
         for qst_src in gen; do
             #gen_mdl="pgc-subset500"
             #out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
-            out_dir="${ckpt_dir}/${dataset}/bart"
+            out_dir="${ckpt_dir}/${tmp}/bart"
             mkdir -p ${out_dir}
 
             #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
@@ -159,15 +161,15 @@ function predict_extractive() {
             #pred_file="/home/awang/projects/qags/data/xsum/random1000/qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
             #out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
             if [ ${topk} -gt 0 ]; then
-                pred_file="/home/awang/projects/qags/data/xsum/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${dataset}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${dataset}-${txt_fld}.json"
+                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}-reverse/qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}-reverse.${tmp}-${txt_fld}.json"
             elif [ ${beam} -gt 0 ]; then
                 #pred_file="/home/awang/projects/qags/data/xsum/random1000-5ans/qst${n_qsts}-${qst_src}-beam${beam}.${dataset}-${txt_fld}.json"
-                pred_file="/home/awang/projects/qags/data/xsum/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${dataset}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${dataset}-${txt_fld}.json"
+                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}-reverse/qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}-reverse.${tmp}-${txt_fld}.json"
             else
-                pred_file="/home/awang/projects/qags/data/xsum/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${dataset}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${dataset}-${txt_fld}.json"
+                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}-reverse/qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}-reverse.${tmp}-${txt_fld}.json"
             fi
 
             # NOTE(Alex): maybe need --version_2_with_negative \
