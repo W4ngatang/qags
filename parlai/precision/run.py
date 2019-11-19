@@ -12,11 +12,14 @@ def set_args():
     args = make_flags()
 
     curr_time = datetime.now()
-    out_file = f"mturk_data.{curr_time.strftime('%m%d%H%M')}.jsonl"
-    args['out_file'] = f'/home/awang/projects/qags/data/mturk/summary/precision/{out_file}'
+    out_dir = f"/home/awang/projects/qags/data/mturk/summary/precision"
+    out_file = f"{curr_time.strftime('%m%d%H%M')}.mturk_data.jsonl"
+    bonus_file = f"{curr_time.strftime('%m%d%H%M')}.bonuses.csv"
+    args['out_file'] = f'{out_dir}/{out_file}'
+    args['bad_worker_file'] = f'/home/awang/projects/qags/data/mturk/bad_workers.txt'
+    args['bonus_file'] = f'{out_dir}/{bonus_file}'
 
     args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/summary'
-    #args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/xsum'
     shard_n = 5
     args['model_comparisons'] = [
                                  #(f'src_para_nex5_randorder_shard{shard_n}', f'bart_sent_nex5_randorder_shard{shard_n}'),

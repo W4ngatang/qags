@@ -4,6 +4,7 @@ import os
 import time
 import glob
 import json
+from tqdm import tqdm
 from datetime import datetime
 from collections import defaultdict
 import ipdb
@@ -21,6 +22,7 @@ PATHS = {
                      '/home/awang/projects/ParlAI/parlai/mturk/run_data/live/'),
         }
 
+BONUS_MSG = 'Bonus for performing HIT well!'
 BAD_RESPONSES = ['[RETURNED]', '[DISCONNECT]']
 CHOICE2ANS = {'2': 'no', '1': 'yes'}
 
@@ -121,7 +123,8 @@ def main(opt):
                     didnt_approve.append(asgn_id)
                     print(f"Failed to approve: {asgn_id}")
             print(f"\tApproved {n_approved} HITs")
-            print(f"\tFailed to approve assignments {','.join(didnt_approve)}")
+            if didnt_approve:
+                print(f"\tFailed to approve assignments {','.join(didnt_approve)}")
         else:
             print("\tCancelled approvals")
 
@@ -137,6 +140,52 @@ def main(opt):
 
         else:
             print("\tCancelled approvals.")
+
+    def award_from_file(bonus_file, msg):
+        awards = [r.split(',') for r in open(bonus_file, encoding="utf-8")]
+        total_bonus = sum(float(award[-1]) for award in awards)
+        conf = input(f"Confirm awarding total bonus ${total_bonus} to {len(awards)} workers? ")
+        if conf == "y":
+            n_awarded = 0
+            amt_awarded = 0.0
+            didnt_award = list()
+            for award in tqdm.tqdm(awards):
+                worker_id, asgn_id, request_tok, bonus_amt = award
+                bonus_amt = float(bonus_amt)
+                try:
+                    mturk_manager.pay_bonus(worker_id=worker_id,
+                                            bonus_amount=bonus_amt,
+                                            assignment_id=asgn_id,
+                                            reason=msg,
+                                            unique_request_token=request_tok)
+                    n_awarded += 1
+                    amt_awarded += bonus_amt
+                except:
+                    didnt_award.append((worker_id, asgn_id, request_tok, bonus_amt))
+                    #print(f"\tFailed to award bonus to {worker_id}")
+            print(f"Awarded {amt_awarded} to {n_awarded} workers.")
+            if didnt_award:
+                for worker_id, asgn_id, request_tok, bonus_amt in didnt_award:
+                    print(f"\tFailed to award bonus {bonus_amt} to {worker_id} for assignment {asgn_id} (tok: {request_tok})")
+        else:
+            print("\tCancelled bonus.")
+
+    def award_bonus(worker_id, bonus_amt, asgn_id, msg, request_tok):
+        conf = input(f"Confirm awarding ${bonus_amt} to {worker_id}?")
+        if conf == "y":
+            try:
+                mturk_manager.pay_bonus(worker_id=worker_id,
+                                        bonus_amount=bonus_amt,
+                                        assignment_id=asgn_id,
+                                        reason=msg,
+                                        unique_request_token=request_tok)
+                print(f"\tSuccessfully approved!")
+            except:
+                print(f"\tFailed to approve.")
+        else:
+            print("\tCancelled bonus.")
+
+
 
     def inspect_assignment(asgn_id):
         """ """
@@ -270,7 +319,6 @@ def main(opt):
 
     # main loop
     while True:
-        #run_id = input("Enter run ID: ")
         print("Enter 'p' to print runs")
         cmd = input("Enter command: ")
         if len(cmd) == 0 or cmd == "exit":
@@ -282,7 +330,7 @@ def main(opt):
             assert len(cmd_parts) == 3, "Insufficient arguments!"
             inspect_run_worker_pair(cmd_parts[1], cmd_parts[2])
         elif cmd_parts[0] in ["get-asgn", 'ga']:
-            assert len(cmd_parts) == 3, "Insufficient arguments!"
+            assert len(cmd_parts) == 3, "Insufficient arguments! Please provide worker_id and ..."
             inspect_hit_worker_pair(cmd_parts[1], cmd_parts[2])
         elif cmd_parts[0] == "inspect-asgn":
             assert len(cmd_parts) > 1, "No assignment ID provided."
@@ -300,14 +348,16 @@ def main(opt):
         elif cmd_parts[0] == "approve-asgn":
             assert len(cmd_parts) > 1, "No assignment ID provided."
             approve_assignment(cmd_parts[1])
-        elif cmd_parts[0] == "d":
+        elif cmd_parts[0] == "award-from-file":
+            assert len(cmd_parts) > 1, "No file provided."
+            if not os.path.exists(cmd_parts[1]):
+                print(f"File {cmd_parts[1]} not found!")
+                continue
+            award_from_file(cmd_parts[1], BONUS_MSG)
+        elif cmd_parts[0] in ["d", "debug"]:
             ipdb.set_trace()
         else:
             print(f"Command `{cmd}` not understood.")
-
-    #for run_id in run_ids:
-    #    approve_run_hits(run_id)
-
 
 
 if __name__ == '__main__':

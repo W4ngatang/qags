@@ -670,8 +670,18 @@ def main(opt, task_config):
                 workers_to_block = [worker.strip() for worker in bad_worker_fh]
             print(f"\tLoaded {len(workers_to_block)} bad workers from {opt['bad_worker_file']}.")
         else:
+            workers_to_block = list()
             print(f"\tNo previous bad workers from {opt['bad_worker_file']}.")
         bad_worker_fh = open(opt['bad_worker_file'], 'a')
+    else:
+        workers_to_block = list()
+        bad_worker_fh = None
+
+    if opt['ok_worker_file'] is not None and not opt['is_sandbox'] and os.path.exists(opt['ok_worker_file']):
+        with open(opt['ok_worker_file'], 'r') as worker_fh:
+            workers_to_allow = [worker.strip() for worker in worker_fh]
+        print(f"\tLoaded {len(workers_to_allow)} ok workers from {opt['ok_worker_file']}.")
+
     if opt['bonus_file'] is not None:
         bonus_fh = open(opt['bonus_file'], 'a')
         print(f"Logging bonuses awarded to {opt['bonus_file']}.")
@@ -688,8 +698,12 @@ def main(opt, task_config):
                     blocked_workers.append(worker_id)
                 except:
                     print(f"Failed to block {worker_id}")
+        elif opt['is_sandbox']:
             mturk_manager.un_soft_block_worker(ALEX_ID)
 
+        if opt['ok_worker_file'] is not None and not opt['is_sandbox']:
+            for worker in workers_to_allow:
+                mturk_manager.un_soft_block_worker(worker_id)
 
         # Set up the sockets and threads to recieve workers
         mturk_manager.ready_to_accept_workers()
