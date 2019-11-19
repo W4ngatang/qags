@@ -258,12 +258,12 @@ def aggregate_questions_from_txt():
     Each fseq log should have the txt field as 'source' (S)
     and the questions as generated 'hypotheses' (H) """
 
-    data = 'xsum'
+    data = 'cnndm'
     data_dir = f"{DATA_DIR}/cnndailymail/fseq" if data == "cnndm" else f"{DATA_DIR}/xsum"
     n_exs = 1000
     n_ans = 10
     dataset = f'{data}-random{n_exs}'
-    mdl = "bart"
+    mdl = "bus"
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
         src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src.random1000.txt"
@@ -281,7 +281,7 @@ def aggregate_questions_from_txt():
     beam = 10
     topk = 0
     topp = 0
-    reverse_prob = False
+    reverse_prob = True
     if topk > 0:
         src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
         gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
