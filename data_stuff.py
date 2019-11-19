@@ -21,7 +21,10 @@ from scipy.stats import pearsonr, spearmanr
 
 import rouge
 from nltk import agreement
-from nlgeval import compute_metrics, NLGEval
+try:
+    from nlgeval import compute_metrics, NLGEval
+except ModuleNotFoundError as e:
+    print("Unable to import NLGEval library!")
 from nltk.tokenize import sent_tokenize
 #from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
 
@@ -255,15 +258,16 @@ def aggregate_questions_from_txt():
     Each fseq log should have the txt field as 'source' (S)
     and the questions as generated 'hypotheses' (H) """
 
-    data = 'cnndm'
+    data = 'xsum'
     data_dir = f"{DATA_DIR}/cnndailymail/fseq" if data == "cnndm" else f"{DATA_DIR}/xsum"
     n_exs = 1000
     n_ans = 10
     dataset = f'{data}-random{n_exs}'
-    mdl = "bus"
+    mdl = "bart"
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
         src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src.random1000.txt"
+        #src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_w_trg.random1000.txt"
         gen_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{mdl}.random1000.txt"
         src_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_{n_ans}ans.random1000.txt"
         gen_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{mdl}_{n_ans}ans.random1000.txt"
@@ -277,7 +281,7 @@ def aggregate_questions_from_txt():
     beam = 10
     topk = 0
     topp = 0
-    reverse_prob = True
+    reverse_prob = False
     if topk > 0:
         src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
         gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
@@ -289,8 +293,6 @@ def aggregate_questions_from_txt():
         src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
         gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
     else:
-        #src_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/src2bart/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
-        #gen_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/bart2src/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
         src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
         gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
         src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
@@ -356,6 +358,8 @@ def aggregate_questions_from_txt():
             raw_data[i] = {txt_fld: txt, "hypotheses": clean_qsts}
 
         data = format_squad(raw_data, context=txt_fld, ctx_split=True)
+        #if txt_fld == "src":
+        #    txt_fld = "src_w_trg"
         if beam > 0:
             out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
         elif topk > 0:
@@ -1336,19 +1340,19 @@ aggregate_questions_from_txt()
 #prepare_parlai_data()
 
 
-compute_correlations_with_human(turk_files=exp_d[gen_mdl],
-                                ref_file=exp_d["ref"],
-                                hyp_file=exp_d["hyp"][gen_mdl],
-                                mdl=gen_mdl,
-                                qags_src_file=qags_src_file,
-                                qags_trg_file=qags_trg_file,
-                                n_qsts_per_doc=n_qsts_per_doc
-                                )
-
-if src_inp_file and trg_inp_file:
-    inspect_qas(src_inp_file=src_inp_file,
-                gen_inp_file=trg_inp_file,
-                src_out_file=qags_src_file,
-                gen_out_file=qags_trg_file)
+#compute_correlations_with_human(turk_files=exp_d[gen_mdl],
+#                                ref_file=exp_d["ref"],
+#                                hyp_file=exp_d["hyp"][gen_mdl],
+#                                mdl=gen_mdl,
+#                                qags_src_file=qags_src_file,
+#                                qags_trg_file=qags_trg_file,
+#                                n_qsts_per_doc=n_qsts_per_doc
+#                                )
+#
+#if src_inp_file and trg_inp_file:
+#    inspect_qas(src_inp_file=src_inp_file,
+#                gen_inp_file=trg_inp_file,
+#                src_out_file=qags_src_file,
+#                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
