@@ -264,13 +264,10 @@ def aggregate_questions_from_txt():
     n_ans = 10
     dataset = f'{data}-random{n_exs}'
     mdl = "bart"
-    use_src_w_trg = False
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
-        if use_src_w_trg:
-            src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_w_trg.random1000.txt"
-        else:
-            src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src.random1000.txt"
+        src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src.random1000.txt"
+        src_w_trg_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_w_trg.random1000.txt" if data == "xsum" else None
         gen_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{mdl}.random1000.txt"
         src_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_{n_ans}ans.random1000.txt"
         gen_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{mdl}_{n_ans}ans.random1000.txt"
@@ -321,6 +318,9 @@ def aggregate_questions_from_txt():
         txts = load_txt(field_files["txt"])
         all_txts[txt_fld] = txts
 
+        if txt_fld == "src" and src_w_trg_txt_file is not None:
+            txts = load_txt(src_w_trg_txt_file)
+            all_txts["src_w_trg"] = txts
         if txt_fld != "gen":
             continue
 
@@ -336,41 +336,49 @@ def aggregate_questions_from_txt():
     # build the data then write out a SQuAD format file
     min_clean_qsts = n_gen_qsts
     min_clean_idxs = list()
-    for txt_fld, qst_src in itertools.product(all_txts, all_qsts):
+    for qst_src in all_qsts:
         if qst_src != "gen":
             continue
 
-        txts = all_txts[txt_fld]
         qsts, probs, anss = all_qsts[qst_src]
+        all_clean_qsts = list()
 
-        raw_data = {}
+        # Filter questions
         for i in tqdm(range(n_exs), desc="Filtering questions"):
-            txt = txts[i * n_ans].split()
             cand_qsts = qsts[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
             cand_probs = probs[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
             cand_anss = anss[(i * n_ans): ((i + 1) * n_ans)] if anss else list()
             clean_qsts, n_clean_qsts = filter_qsts(cand_qsts, cand_probs, cand_anss, n_qsts,
                                                    reverse_prob=reverse_prob)
+            # Bookkeeping for questions
             for qst in clean_qsts:
                 assert not isinstance(qst, list), "List instead of string detected!"
-
+            all_clean_qsts.append(clean_qsts)
             if n_clean_qsts <= min_clean_qsts:
                 min_clean_qsts = n_clean_qsts
                 if i not in min_clean_idxs:
                     min_clean_idxs.append(i)
-            raw_data[i] = {txt_fld: txt, "hypotheses": clean_qsts}
 
-        data = format_squad(raw_data, context=txt_fld, ctx_split=True)
-        if txt_fld == "src" and use_src_w_trg:
-            txt_fld = "src_w_trg"
-        if beam > 0:
-            out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
-        elif topk > 0:
-            out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topk{topk}.{dataset}-{txt_fld}.json"
-        elif topp > 0:
-            out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topp{topp}.{dataset}-{txt_fld}.json"
-        print(f"Writing to {out_file}")
-        json.dump(data, open(out_file, "w", encoding="utf-8"))
+        # Construct data in SQuAD-like format
+        for txt_fld in all_txts:
+            txts = all_txts[txt_fld]
+
+            raw_data = {}
+            for i in tqdm(range(n_exs), desc="Formatting data"):
+                txt = txts[i * n_ans].split()
+                clean_qsts = all_clean_qsts[i]
+                raw_data[i] = {txt_fld: txt, "hypotheses": clean_qsts}
+
+            data = format_squad(raw_data, context=txt_fld, ctx_split=True)
+            if beam > 0:
+                out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
+            elif topk > 0:
+                out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topk{topk}.{dataset}-{txt_fld}.json"
+            elif topp > 0:
+                out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topp{topp}.{dataset}-{txt_fld}.json"
+            print(f"Writing to {out_file}")
+            json.dump(data, open(out_file, "w", encoding="utf-8"))
+
     print(f"Min n clean questions: {min_clean_qsts}")
     print(f"\tidxs: {min_clean_idxs}")
 

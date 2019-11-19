@@ -151,7 +151,7 @@ def format_squad(raw_data, context="src", ctx_split=False):
     returns:
         - data: SQuAD formatted data
     """
-    assert context in ["src", "trg", "gen"]
+    #assert context in ["src", "trg", "gen"]
     qa_idx = 0
     data = list()
     for datum_idx, raw in tqdm(raw_data.items(), desc="Formatting SQUAD"):
