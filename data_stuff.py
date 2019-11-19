@@ -122,7 +122,7 @@ def get_spacy_nlp(model="en_trf_robertabase_lg"):
 
 @lru_cache(maxsize=512)
 def get_nlgeval():
-    nlgeval = NLGEval(no_skipthoughts=True, no_glove=True, metrics_to_omit=['CIDEr'])
+    nlgeval = NLGEval(no_skipthoughts=True, no_glove=True, metrics_to_omit=['ROUGE_L', 'CIDEr'])
     return nlgeval
 
 def extract_ans(txts):
@@ -262,16 +262,17 @@ def aggregate_questions_from_txt():
     dataset = f'{data}-random{n_exs}'
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
-        src_txt_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.src.10251125.random1000.txt"
-        gen_txt_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.bart.10251125.random1000.txt"
-        src_ans_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.src_ans.10251125.random1000.txt"
-        gen_ans_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.bart_ans.10251125.random1000.txt"
+        #src_txt_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.src.10251125.random1000.txt"
+        src_txt_file = f"{DATA_DIR}/{data}/random{n_exs}-{n_ans}ans/{data}.test.src_w_trg.random1000.txt"
+        gen_txt_file = f"{DATA_DIR}/{data}/random{n_exs}-{n_ans}ans/{data}.test.bart.random1000.txt"
+        src_ans_file = f"{DATA_DIR}/{data}/random{n_exs}-{n_ans}ans/{data}.test.src_ans.random1000.txt"
+        gen_ans_file = f"{DATA_DIR}/{data}/random{n_exs}-{n_ans}ans/{data}.test.bart_ans.random1000.txt"
     else:
         src_txt_file = f"{DATA_DIR}/xsum/random{n_exs}/src2bart/raw/test.src"
         gen_txt_file = f"{DATA_DIR}/xsum/random{n_exs}/bart2src/raw/test.src"
 
     n_qsts = 10 # n questions we actually want to use
-    qg_model = "qg-squad2-ans"
+    qg_model = "qg-newsqa-ans"
     n_gen_qsts = 10 # n questions generated per doc
     beam = 10
     topk = 0
@@ -1197,9 +1198,13 @@ subset1000_data = {
 xsum_subset1000_data = {
     "bart": [
             # order: shard 0, 1, 2, ...
-            "data/mturk/xsum/precision/mturk_data.11051235.jsonl",
-            "data/mturk/xsum/precision/mturk_data.11060913.jsonl",
-            "data/mturk/xsum/precision/mturk_data.11151249.jsonl",
+            #"data/mturk/xsum/precision/mturk_data.11051235.jsonl", # 0
+            #"data/mturk/xsum/precision/mturk_data.11060913.jsonl", # 1
+            #"data/mturk/xsum/precision/mturk_data.11151249.jsonl", # 2
+            # following use trg sentence
+            "data/mturk/xsum/precision/11181548.mturk_data.jsonl",  # 3
+            "data/mturk/xsum/precision/11190856.mturk_data.jsonl",  # 4
+            #"data/mturk/xsum/precision/111910XX.mturk_data.jsonl",  # 5
            ],
 
     "hyp": {"bart": "data/xsum.test.bart.10251125.random1000.txt"},
@@ -1211,6 +1216,7 @@ dataset = "cnndm"
 subset = "random1000"
 gen_mdl = "bus"
 qg_mdl = "bart"
+qa_mdl = "qg-squad2-ans"
 exp_name = f"{dataset}-{subset}"
 
 src_inp_file = ""
@@ -1244,22 +1250,22 @@ elif exp_name == "cnndm-random1000":
     #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-newsqa-ans-beam10.cnndm-random1000-{n_ans}ans-gen.json"
     #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.cnndm-random1000-{n_ans}ans-src.json"
     #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.cnndm-random1000-{n_ans}ans-gen.json"
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-newsqa-ans-beam10-reverse.cnndm-random1000-{n_ans}ans-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-newsqa-ans-beam10-reverse.cnndm-random1000-{n_ans}ans-gen.json"
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-gen.json"
 
 
 elif exp_name == "xsum-random1000":
     exp_d = xsum_subset1000_data
     n_qsts_per_doc = 10 #6
     n_ans = 10
-    src_inp_file = f"data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-{n_ans}ans-src.json"
-    trg_inp_file = f'data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-{n_ans}ans-gen.json'
+    src_inp_file = f"data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-src.json"
+    trg_inp_file = f'data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
     #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
     #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json"
     #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-src.json"
     #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-gen.json"
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-{n_ans}ans-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.xsum-random1000-{n_ans}ans-gen.json"
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json"
 
 else:
     raise ValueError(f"Experiment name not found {exp_name}!")

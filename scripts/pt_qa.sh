@@ -117,15 +117,36 @@ function evaluate_v1_1() {
 }
 
 function evaluate_v2_0() {
-	export data_file="/private/home/wangalexc/data/squad/v2.0/original/dev.json"
 
-	# bert base uncased
- 	#export pred_file="/checkpoint/wangalexc/ppb/bert-base-uncased/squad_v2_0/06-25-2019/predictions.json"
+    date="06-25-2019"
+    squad_version="v2_0"
+    ckpt_dir="/misc/vlgscratch4/BowmanGroup/awang/ckpts"
+    ckpt_dir="${ckpt_dir}/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}"
+	data_file="/misc/vlgscratch4/BowmanGroup/awang/processed_data/squad/v2.0/original/dev.json"
+    out_dir="${ckpt_dir}/squad${squad_version}/dev"
+	out_file="${out_dir}/predictions.json"
+    gpu_id=0
+    
+    mkdir -p ${out_dir}
 
-	# bert large uncased
-	export pred_file="/checkpoint/wangalexc/ppb/bert-large-uncased/squad_v2_0/06-25-2019/predictions.json"
+    # make predictions
+    python finetune_pt_squad.py \
+      --local_rank ${gpu_id} \
+      --bert_model ${bert_version} \
+      --do_predict \
+      --do_lower_case \
+      --predict_file ${data_file} \
+      --max_seq_length 384 \
+      --doc_stride 128 \
+      --output_dir ${out_dir} \
+      --prediction_file ${out_file} \
+      --overwrite_output_dir \
+      --load_model_from_dir ${ckpt_dir} \
+      --version_2_with_negative;
 
-	python evaluate-squad-v2-0.py ${data_file} ${pred_file}
+    # evaluate predictions
+	python evaluate-squad-v2-0.py --data-file ${data_file} --pred-file ${out_file}
+
 }
 
 function predict_extractive() {
