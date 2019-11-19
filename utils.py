@@ -6,7 +6,9 @@ import json
 import copy
 import random
 import itertools
+from tqdm import tqdm
 from collections import defaultdict
+import ipdb
 
 def filter_line_fseq(line):
     """ Detect if actually a line that we care about
@@ -138,7 +140,7 @@ def swap_fields(data, swap_d):
         new_data[datum_idx] = new_datum
     return new_data
 
-def format_squad(raw_data, context="src"):
+def format_squad(raw_data, context="src", ctx_split=False):
     """ Format data into SQuAD format.
 
     args:
@@ -151,17 +153,19 @@ def format_squad(raw_data, context="src"):
     """
     assert context in ["src", "trg", "gen"]
     qa_idx = 0
-    data = []
-    for datum_idx, raw in raw_data.items():
+    data = list()
+    for datum_idx, raw in tqdm(raw_data.items(), desc="Formatting SQUAD"):
         datum = {}
-        datum["context"] = raw[context]
+        if ctx_split:
+            datum["context"] = " ".join(raw[context])
+            dummy_title = " ".join(raw[context][:5])
+        else:
+            datum["context"] = raw[context]
+            dummy_title = " ".join(raw[context].split()[:5])
 
-        #dummy_title = random.choice(raw[context].split())
-        dummy_title = " ".join(raw[context].split()[:5])
-
-        qas = []
-        for raw_qa in raw["hypotheses"]:
-            qa = {"question": raw_qa[0],
+        qas = list()
+        for idx, raw_qa in enumerate(raw["hypotheses"]):
+            qa = {"question": raw_qa,
                   "answers": [],
                   "id": qa_idx
                  }

@@ -8,6 +8,7 @@ import json
 import copy
 import random
 import itertools
+from tqdm import tqdm
 from datetime import datetime
 from functools import lru_cache
 from collections import defaultdict, Counter
@@ -75,7 +76,7 @@ def detokenize_sent(sent):
     return sent
 
 
-def filter_qsts(qsts, probs, anss, n_qsts):
+def filter_qsts(qsts, probs, anss, n_qsts, reverse_prob=False):
     """ Filter out questions by a number of criteria
     - repetitions: exact repetitions
     - length: short sentences are excluded
@@ -86,13 +87,11 @@ def filter_qsts(qsts, probs, anss, n_qsts):
 
     """
 
-    qsts_and_probs = sorted(zip(qsts, probs), key=lambda x: x[1])
+    qsts_and_probs = sorted(zip(qsts, probs), key=lambda x: x[1], reverse=not reverse_prob)
     clean_qsts = list()
     clean_probs = list()
     for qst, prob in qsts_and_probs:
-        tok_qst = qst.split() # might not be standalone token
         try:
-            #qst_idx = tok_qst.index('?') # get idx of *first* '?'
             qst_idx = qst.index('?') # get idx of *first* '?'
             # filter out stuff after '?'
             clean_qst = qst[:qst_idx + 1]
@@ -108,7 +107,7 @@ def filter_qsts(qsts, probs, anss, n_qsts):
     if n_clean_qsts < n_qsts:
         print("Too few questions!")
         supp_qsts = random.sample(qsts, n_qsts - n_clean_qsts)
-        clean_qsts.append(supp_qsts)
+        clean_qsts += supp_qsts
 
     return clean_qsts[:n_qsts], n_clean_qsts
 
@@ -249,67 +248,76 @@ def aggregate_questions_from_txt():
     Each fseq log should have the txt field as 'source' (S)
     and the questions as generated 'hypotheses' (H) """
 
-    data = 'xsum'
+    data = 'cnndm'
+    data_dir = f"{DATA_DIR}/cnndailymail/fseq" if data == "cnndm" else f"{DATA_DIR}/xsum"
     n_exs = 1000
-    n_ans = 5
+    n_ans = 10
     dataset = f'{data}-random{n_exs}'
+    mdl = "bus"
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
-        src_txt_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.src.10251125.random1000.txt"
-        gen_txt_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.bart.10251125.random1000.txt"
-        src_ans_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.src_ans.10251125.random1000.txt"
-        gen_ans_file = f"{DATA_DIR}/xsum/random{n_exs}-{n_ans}ans/xsum.test.bart_ans.10251125.random1000.txt"
+        src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src.random1000.txt"
+        gen_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{mdl}.random1000.txt"
+        src_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_{n_ans}ans.random1000.txt"
+        gen_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{mdl}_{n_ans}ans.random1000.txt"
     else:
-        src_txt_file = f"{DATA_DIR}/xsum/random{n_exs}/src2bart/raw/test.src"
-        gen_txt_file = f"{DATA_DIR}/xsum/random{n_exs}/bart2src/raw/test.src"
+        src_txt_file = f"{data_dir}/random{n_exs}/src2bart/raw/test.src"
+        gen_txt_file = f"{data_dir}/random{n_exs}/bart2src/raw/test.src"
 
-    n_qsts = 10 # n questions we actually want to use
     qg_model = "qg-squad2-ans"
+    n_qsts = 10 # n questions we actually want to use
     n_gen_qsts = 10 # n questions generated per doc
     beam = 10
     topk = 0
     topp = 0
+    reverse_prob = True
     if topk > 0:
-        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
-        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
-        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
-        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
+        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
+        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
+        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
+        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
     elif topp > 0:
-        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
-        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
-        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
-        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
+        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
+        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
+        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
+        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
     else:
         #src_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/src2bart/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
         #gen_qst_file = f"/checkpoint/wangalexc/bart/xsum-random{n_exs}/bart2src/denoising.8.60.6.1.0.nhyps{n_qsts}.processed"
-        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
-        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
-        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2bart/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
-        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/bart2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
-    out_dir = f"{PROJ_DIR}/data/xsum/random{n_exs}"
-    if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
+        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
+        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
+        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
     files = {
              "src": {"txt": src_txt_file, "qst": src_qst_file, "probs": src_prob_file},
              "gen": {"txt": gen_txt_file, "qst": gen_qst_file, "probs": gen_prob_file},
             }
+    out_dir = f"{PROJ_DIR}/data/{data}/random{n_exs}"
     if n_ans > 0:
         out_dir = f"{out_dir}-{n_ans}ans"
         n_gen_qsts *= n_ans
         files["src"]["ans"] = src_ans_file
         files["gen"]["ans"] = gen_ans_file
+    if reverse_prob:
+        out_dir = f"{out_dir}-reverse"
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
     print(f"Reading data from {src_qst_file} and {gen_qst_file}, saving to {out_dir}")
 
     all_txts, all_qsts = {}, {}
     for txt_fld, field_files in files.items():
         txts = load_txt(field_files["txt"])
+        all_txts[txt_fld] = txts
+
+        if txt_fld != "gen":
+            continue
+
         qsts = load_txt(field_files["qst"])
         probs = [float(f) for f in load_txt(field_files["probs"])]
         if "ans" in field_files:
             ans = load_txt(field_files["ans"])
         else:
             ans = list()
-        all_txts[txt_fld] = txts
         all_qsts[txt_fld] = (qsts, probs, ans)
 
     # for each (question from a source x txt source) pair,
@@ -317,30 +325,37 @@ def aggregate_questions_from_txt():
     min_clean_qsts = n_gen_qsts
     min_clean_idxs = list()
     for txt_fld, qst_src in itertools.product(all_txts, all_qsts):
+        if qst_src != "gen":
+            continue
+
         txts = all_txts[txt_fld]
         qsts, probs, anss = all_qsts[qst_src]
 
         raw_data = {}
-        for i in range(n_exs):
-            txt = txts[i * n_ans]
+        for i in tqdm(range(n_exs), desc="Filtering questions"):
+            txt = txts[i * n_ans].split()
             cand_qsts = qsts[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
             cand_probs = probs[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
             cand_anss = anss[(i * n_ans): ((i + 1) * n_ans)] if anss else list()
-            clean_qsts, n_clean_qsts = filter_qsts(cand_qsts, cand_probs, cand_anss, n_qsts)
-            qst = [[q] for q in clean_qsts]
+            clean_qsts, n_clean_qsts = filter_qsts(cand_qsts, cand_probs, cand_anss, n_qsts,
+                                                   reverse_prob=reverse_prob)
+            for qst in clean_qsts:
+                assert not isinstance(qst, list), "List instead of string detected!"
+
             if n_clean_qsts <= min_clean_qsts:
                 min_clean_qsts = n_clean_qsts
                 if i not in min_clean_idxs:
                     min_clean_idxs.append(i)
-            raw_data[i] = {txt_fld: txt, "hypotheses": qst}
+            raw_data[i] = {txt_fld: txt, "hypotheses": clean_qsts}
 
-        data = format_squad(raw_data, context=txt_fld)
+        data = format_squad(raw_data, context=txt_fld, ctx_split=True)
         if beam > 0:
             out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
         elif topk > 0:
             out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topk{topk}.{dataset}-{txt_fld}.json"
         elif topp > 0:
             out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-topp{topp}.{dataset}-{txt_fld}.json"
+        print(f"Writing to {out_file}")
         json.dump(data, open(out_file, "w", encoding="utf-8"))
     print(f"Min n clean questions: {min_clean_qsts}")
     print(f"\tidxs: {min_clean_idxs}")
@@ -596,11 +611,30 @@ def prepare_ans_conditional_data():
     Will generate CONST instances for each line in txt
     """
 
-    n_ans_per_txt = 5 # at least 2 for an ANS and NO_ANS
-    data_file = f"{DATA_DIR}/xsum/random1000/xsum.test.src.10251125.random1000.txt"
-    out_file = f"{DATA_DIR}/xsum/random1000/xsum.test.src_w_{n_ans_per_txt}ans.bart.10251125.random1000.txt"
-    ans_out_file = f"{DATA_DIR}/xsum/random1000/xsum.test.src_{n_ans_per_txt}ans.bart.10251125.random1000.txt"
+    n_ans_per_txt = 10
+    txt_fld = "src"
+
+    data_file = f"{DATA_DIR}/xsum/random1000/xsum.test.{txt_fld}.10251125.random1000.txt"
+    out_dir = f"{DATA_DIR}/xsum/random1000-{n_ans_per_txt}ans"
+    txt_w_ans_file = f"{out_dir}/xsum.test.{txt_fld}_w_{n_ans_per_txt}ans.10251125.random1000.txt"
+    txt_file = f"{out_dir}/xsum.test.{txt_fld}.10251125.random1000.txt"
+    ans_file = f"{out_dir}/xsum.test.{txt_fld}_{n_ans_per_txt}ans.10251125.random1000.txt"
+
+    #data_file = f"{DATA_DIR}/cnndailymail/fseq/subset1000/subset1000.{txt_fld}.random.ref_order.txt"
+    #out_dir = f"{DATA_DIR}/cnndailymail/fseq/random1000-{n_ans_per_txt}ans"
+    #txt_w_ans_file = f"{out_dir}/cnndm.test.{txt_fld}_w_{n_ans_per_txt}ans.random1000.txt"
+    #txt_file = f"{out_dir}/cnndm.test.{txt_fld}.random1000.txt"
+    #ans_file = f"{out_dir}/cnndm.test.{txt_fld}_{n_ans_per_txt}ans.random1000.txt"
+
+    use_only_no_ans = True
+    use_no_ans = False
     print(f"Preparing answer conditional question generation data for {data_file}")
+    if use_only_no_ans:
+        print("\twith ONLY NO_ANS!")
+    elif use_no_ans:
+        print("\twith NO_ANS option!")
+    else:
+        print("\twithout NO_ANS option!")
 
     all_txts = load_txt(data_file)
     print("Extracting entities...")
@@ -614,24 +648,42 @@ def prepare_ans_conditional_data():
 
     print("Writing...")
     txts_w_ans = list()
+    all_txt = list()
     all_ans = list()
     for txt, anss in zip(all_txts, all_anss):
-        if len(anss) > n_ans_per_txt - 1:
-            anss = random.sample(anss, n_ans_per_txt - 1)
-        anss += [NO_ANS_TOK] * (n_ans_per_txt - len(anss))
-        assert NO_ANS_TOK in anss, ipdb.set_trace()
+        if use_only_no_ans:
+            anss = [NO_ANS_TOK] * n_ans_per_txt
+        elif use_no_ans:
+            if len(anss) > n_ans_per_txt - 1:
+                anss = random.sample(anss, k=n_ans_per_txt - 1)
+            anss += [NO_ANS_TOK] * (n_ans_per_txt - len(anss))
+            assert NO_ANS_TOK in anss, ipdb.set_trace()
+        else:
+            if len(anss) < n_ans_per_txt:
+                extra_anss = random.choices(anss, k=n_ans_per_txt - len(anss))
+                anss += extra_anss
+            if len(anss) > n_ans_per_txt:
+                anss = random.sample(anss, n_ans_per_txt)
+            assert len(anss) == n_ans_per_txt, ipdb.set_trace()
+
         for ans in anss:
             txts_w_ans.append(f"{txt} {ANS_TOK} {ans}")
+            all_txt.append(txt)
             all_ans.append(ans)
 
-    with open(out_file, 'w') as out_fh:
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    with open(txt_w_ans_file, 'w') as out_fh:
         for txt in txts_w_ans:
             out_fh.write(f'{txt}\n')
-    with open(ans_out_file, 'w') as out_fh:
+    with open(txt_file, 'w') as out_fh:
+        for txt in all_txt:
+            out_fh.write(f'{txt}\n')
+    with open(ans_file, 'w') as out_fh:
         for ans in all_ans:
             out_fh.write(f'{ans}\n')
     print("\tDone!")
-    print(f"\tWrote {len(txts_w_ans)} sentences to {out_file}")
+    print(f"\tWrote {len(txts_w_ans)} sentences to {txt_w_ans_file}")
 
 
 def prepare_parlai_data():
@@ -1213,7 +1265,7 @@ else:
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
 #aggregate_questions_from_fseq_log()
-#aggregate_questions_from_txt()
+aggregate_questions_from_txt()
 
 
 #extract_subset()
@@ -1223,14 +1275,14 @@ else:
 #prepare_parlai_data()
 
 
-compute_correlations_with_human(turk_files=exp_d[mdl],
-                                ref_file=exp_d["ref"],
-                                hyp_file=exp_d["hyp"][mdl],
-                                mdl=mdl,
-                                qags_src_file=qags_src_file,
-                                qags_trg_file=qags_trg_file,
-                                n_qsts_per_doc=n_qsts_per_doc
-                                )
+#compute_correlations_with_human(turk_files=exp_d[mdl],
+#                                ref_file=exp_d["ref"],
+#                                hyp_file=exp_d["hyp"][mdl],
+#                                mdl=mdl,
+#                                qags_src_file=qags_src_file,
+#                                qags_trg_file=qags_trg_file,
+#                                n_qsts_per_doc=n_qsts_per_doc
+#                                )
 
 #if src_inp_file and trg_inp_file:
 #    inspect_qas(src_inp_file=src_inp_file,
