@@ -149,8 +149,11 @@ def main(opt):
             n_awarded = 0
             amt_awarded = 0.0
             didnt_award = list()
-            for award in tqdm.tqdm(awards):
-                worker_id, asgn_id, request_tok, bonus_amt = award
+            for award in tqdm(awards):
+                try:
+                    worker_id, asgn_id, request_tok, bonus_amt = award
+                except ValueError:
+                    ipdb.set_trace()
                 bonus_amt = float(bonus_amt)
                 try:
                     mturk_manager.pay_bonus(worker_id=worker_id,
@@ -165,10 +168,14 @@ def main(opt):
                     #print(f"\tFailed to award bonus to {worker_id}")
             print(f"Awarded {amt_awarded} to {n_awarded} workers.")
             if didnt_award:
+                print("Failed on:")
                 for worker_id, asgn_id, request_tok, bonus_amt in didnt_award:
-                    print(f"\tFailed to award bonus {bonus_amt} to {worker_id} for assignment {asgn_id} (tok: {request_tok})")
+                    #print(f"\tFailed to award bonus {bonus_amt} to {worker_id} for assignment {asgn_id} (tok: {request_tok})")
+                    print(f"{worker_id},{asgn_id},{request_tok},{bonus_amt}")
         else:
             print("\tCancelled bonus.")
+
+        return
 
     def award_bonus(worker_id, bonus_amt, asgn_id, msg, request_tok):
         conf = input(f"Confirm awarding ${bonus_amt} to {worker_id}?")

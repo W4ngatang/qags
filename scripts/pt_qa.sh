@@ -161,11 +161,11 @@ function predict_extractive() {
     dataset="cnndm"
     subset="random1000-${n_ans}ans"
     tmp="${dataset}-${subset}"
-    qg_model="qg-squad2-ans"
+    qg_model="qg-newsqa-ans"
     beam=10
     topk=0
     topp=0
-    gpu_id=0
+    gpu_id=7
 
     #for gen_mdl in bus-subset fan-subset pgc-subset; do
     for txt_fld in gen src; do
@@ -182,15 +182,15 @@ function predict_extractive() {
             #pred_file="/home/awang/projects/qags/data/xsum/random1000/qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
             #out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
             if [ ${topk} -gt 0 ]; then
-                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}-reverse/qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}-reverse.${tmp}-${txt_fld}.json"
+                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
             elif [ ${beam} -gt 0 ]; then
                 #pred_file="/home/awang/projects/qags/data/xsum/random1000-5ans/qst${n_qsts}-${qst_src}-beam${beam}.${dataset}-${txt_fld}.json"
                 pred_file="/home/awang/projects/qags/data/${dataset}/${subset}-reverse/qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
                 out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}-reverse.${tmp}-${txt_fld}.json"
             else
-                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}-reverse/qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}-reverse.${tmp}-${txt_fld}.json"
+                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
             fi
 
             # NOTE(Alex): maybe need --version_2_with_negative \

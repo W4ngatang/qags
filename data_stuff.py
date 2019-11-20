@@ -25,6 +25,10 @@ try:
     from nlgeval import compute_metrics, NLGEval
 except ModuleNotFoundError as e:
     print("Unable to import NLGEval library!")
+try:
+    from bert_score import score as bert_score
+except ModuleNotFoundError as e:
+    print("Unable to import BERT Score!")
 from nltk.tokenize import sent_tokenize
 #from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
 
@@ -52,7 +56,7 @@ NO_TRAILING_SPACE_PUNCT = [' `']#, ' \'']
 
 import socket
 hostname = socket.gethostname()
-if 'nyu' in hostname:
+if 'nyu' in hostname or 'dgx' in hostname:
     PROJ_DIR = '/home/awang/projects/qags'
     CKPT_DIR = '/misc/vlgscratch4/BowmanGroup/awang/ckpts'
     DATA_DIR = '/misc/vlgscratch4/BowmanGroup/awang/processed_data'
@@ -122,10 +126,12 @@ def get_spacy_nlp(model="en_trf_robertabase_lg"):
     nlp = spacy.load(model)
     return nlp
 
+
 @lru_cache(maxsize=512)
 def get_nlgeval():
     nlgeval = NLGEval(no_skipthoughts=True, no_glove=True, metrics_to_omit=['ROUGE_L', 'CIDEr'])
     return nlgeval
+
 
 def extract_ans(txts):
     """ extract entities from a sentence using spacy
@@ -171,14 +177,13 @@ def get_rouge_scores(hyps, refs):
                              stemming=True)
     rouge_d = rouge_eval.get_scores(hyps, refs)
     rouge_avgs = {k: [vv['f'][0] for vv in v] for k, v in rouge_d.items()}
-    #rouge_scores = [[] for _ in range(len(hyps))]
-    #for metric_name, metric_d in rouge_d.items():
-    #    for ex_idx, ex_metrics in enumerate(metric_d):
-    #        rouge_scores[ex_idx].append(ex_metrics['f'][0])
-    #ipdb.set_trace()
-    #rouge_scores = [sum(l) / len(rouge_d) for l in rouge_scores]
-    #return rouge_scores
     return rouge_avgs
+
+
+def get_bert_scores(hyps, refs, model='bert-large-uncased'):
+    """ """
+    pcs, rcl, f1s = bert_score(hyps, refs, model_type=model)
+    return pcs.numpy(), rcl.numpy(), f1s.numpy()
 
 
 def get_lens(txts):
@@ -1026,6 +1031,9 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         print(f"\t{v} tasks with {k} responses")
     print()
 
+    all_hyps = [l.strip() for l in open(hyp_file, encoding='utf-8')]
+    all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
+
     def print_response(par_idx):
         print(f"Paragraph {par_idx}")
         print(f"\t{idx2data[par_idx]}")
@@ -1058,8 +1066,6 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
     def compute_rouge_correlation(idxs, scores):
         """Compute ROUGE correlation with some scores
         """
-        all_hyps = [l.strip() for l in open(hyp_file, encoding='utf-8')]
-        all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
         refs = [all_refs[idx] for idx in idxs]
         hyps = [all_hyps[idx] for idx in idxs]
         rouge_scores = get_rouge_scores(hyps, refs)
@@ -1087,14 +1093,9 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         print(f"\tpearson correlation: {pearson_corr}")
         print(f"\tspearman correlation: {spearman_corr}")
 
-    def compute_nlg_metrics(idxs, human_scores):
+    def compute_ngram_metrics_correlation(idxs, human_scores):
         """Compute BLEU, ROUGE, METEOR, CIDEr """
         nlgeval = get_nlgeval()
-        all_hyps = [l.strip() for l in open(hyp_file, encoding='utf-8')]
-        all_refs = [l.strip() for l in open(ref_file, encoding='utf-8')]
-        #refs = [[all_refs[idx] for idx in idxs]]
-        #hyps = [all_hyps[idx] for idx in idxs]
-        #metrics_dict = nlgeval.compute_metrics(refs, hyps)
         metric2scores = defaultdict(list)
         for idx in idxs:
             refs = [all_refs[idx]]
@@ -1113,13 +1114,32 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
 
         return metric2scores
 
+    def compute_bertscore_correlation(idxs, human_scores):
+        """ Compute BERT Scores and correlations
+        """
+        refs = [all_refs[idx] for idx in idxs]
+        hyps = [all_hyps[idx] for idx in idxs]
+        pcs, rcl, f1s = get_bert_scores(hyps, refs)
+        metric2scores = {
+                         "precision": pcs,
+                         "recall": rcl,
+                         "f1": f1s
+                        }
+        for metric_name, metric_scores in metric2scores.items():
+            pearson_corr = pearsonr(metric_scores, human_scores)
+            spearman_corr = spearmanr(metric_scores, human_scores)
+            print(f"BERT Score {metric_name} mean: {np.mean(metric_scores)}")
+            print(f"\tpearson correlation: {pearson_corr}")
+            print(f"\tspearman correlation: {spearman_corr}")
+
+
 
     print(f"All examples")
     if qags_src_file:
         compute_qags_correlation(idxs, human_scores, metric_name="em")
         compute_qags_correlation(idxs, human_scores, metric_name="f1")
     compute_rouge_correlation(idxs, human_scores)
-    compute_nlg_metrics(idxs, human_scores)
+    compute_ngram_metrics_correlation(idxs, human_scores)
     print()
 
     print(f"Examples with odd # labels ({len(odd_idxs)})")
@@ -1127,7 +1147,8 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="em")
         compute_qags_correlation(odd_idxs, odd_human_scores, metric_name="f1")
     compute_rouge_correlation(odd_idxs, odd_human_scores)
-    compute_nlg_metrics(idxs, human_scores)
+    compute_ngram_metrics_correlation(idxs, human_scores)
+    compute_bertscore_correlation(idxs, human_scores)
     compute_fleiss(kappas3)
     print()
 
@@ -1267,10 +1288,14 @@ xsum_subset1000_data = {
             #"data/mturk/xsum/precision/mturk_data.11051235.jsonl", # 0
             #"data/mturk/xsum/precision/mturk_data.11060913.jsonl", # 1
             #"data/mturk/xsum/precision/mturk_data.11151249.jsonl", # 2
+
             # following use trg sentence
             "data/mturk/xsum/precision/11181548.mturk_data.jsonl",  # 3
             "data/mturk/xsum/precision/11190856.mturk_data.jsonl",  # 4
-            #"data/mturk/xsum/precision/111910XX.mturk_data.jsonl",  # 5
+            "data/mturk/xsum/precision/11191040.mturk_data.jsonl",  # 5
+            "data/mturk/xsum/precision/11191426.mturk_data.jsonl",  # 0
+            "data/mturk/xsum/precision/11201133.mturk_data.jsonl",  # 1
+            #"data/mturk/xsum/precision/11201133.mturk_data.jsonl",  # 2
            ],
 
     "hyp": {"bart": "data/xsum.test.bart.10251125.random1000.txt"},
@@ -1282,8 +1307,12 @@ dataset = "cnndm"
 subset = "random1000"
 gen_mdl = "bus"
 qg_mdl = "bart"
-qa_mdl = "qg-squad2-ans"
+qa_mdl = "qg-newsqa-ans"
 exp_name = f"{dataset}-{subset}"
+n_qsts_per_doc = 10
+n_ans = 10
+reverse_qst = False
+use_src_w_trg = True # xsum only
 
 src_inp_file = ""
 trg_inp_file = ""
@@ -1302,36 +1331,44 @@ elif exp_name == "cnndm-random500":
 
 elif exp_name == "cnndm-random1000":
     exp_d = subset1000_data
-    n_qsts_per_doc = 10
-    n_ans = 10
 
     #src_inp_file = f"data/{dataset}/subset1000/bus-subset1000/qst{n_qsts_per_doc}-ckptbest-gen.{dataset}-src.json"
     #trg_inp_file = f'data/{dataset}/subset1000/bus-subset1000/qst{n_qsts_per_doc}-ckptbest-gen.{dataset}-gen.json'
     #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
     #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
 
-    src_inp_file = f"data/{dataset}/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.{dataset}-random1000-{n_ans}ans-src.json"
-    trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.{dataset}-random1000-{n_ans}ans-gen.json'
-    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-newsqa-ans-beam10.cnndm-random1000-{n_ans}ans-src.json"
-    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-newsqa-ans-beam10.cnndm-random1000-{n_ans}ans-gen.json"
-    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.cnndm-random1000-{n_ans}ans-src.json"
-    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-qg-squad2-ans-beam10.cnndm-random1000-{n_ans}ans-gen.json"
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-gen.json"
+    if reverse_qst:
+        src_inp_file = f"data/{dataset}/random1000-{n_ans}ans-reverse/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-src.json"
+        trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans-reverse/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-gen.json'
+        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-src.json"
+        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-gen.json"
+
+    else:
+        src_inp_file = f"data/{dataset}/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-src.json"
+        trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-gen.json'
+        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-src.json"
+        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-gen.json"
 
 
 elif exp_name == "xsum-random1000":
     exp_d = xsum_subset1000_data
-    n_qsts_per_doc = 10 #6
-    n_ans = 10
-    src_inp_file = f"data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-src.json"
-    trg_inp_file = f'data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
     #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
     #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json"
     #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-src.json"
     #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-gen.json"
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json"
+
+    src_fld = "src_w_trg" if use_src_w_trg else "src"
+    if reverse_qst:
+        src_inp_file = f"data/xsum/random1000-{n_ans}ans-reverse/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
+        trg_inp_file = f'data/xsum/random1000-{n_ans}ans-reverse/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
+        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.xsum-random1000-{n_ans}ans-{src_fld}.json"
+        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.xsum-random1000-{n_ans}ans-gen.json"
+
+    else:
+        src_inp_file = f"data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
+        trg_inp_file = f'data/xsum/random1000-{n_ans}ans/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
+        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
+        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json"
 
 else:
     raise ValueError(f"Experiment name not found {exp_name}!")
@@ -1341,7 +1378,7 @@ else:
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
 #aggregate_questions_from_fseq_log()
-aggregate_questions_from_txt()
+#aggregate_questions_from_txt()
 
 
 #extract_subset()
@@ -1351,19 +1388,19 @@ aggregate_questions_from_txt()
 #prepare_parlai_data()
 
 
-#compute_correlations_with_human(turk_files=exp_d[gen_mdl],
-#                                ref_file=exp_d["ref"],
-#                                hyp_file=exp_d["hyp"][gen_mdl],
-#                                mdl=gen_mdl,
-#                                qags_src_file=qags_src_file,
-#                                qags_trg_file=qags_trg_file,
-#                                n_qsts_per_doc=n_qsts_per_doc
-#                                )
-#
-#if src_inp_file and trg_inp_file:
-#    inspect_qas(src_inp_file=src_inp_file,
-#                gen_inp_file=trg_inp_file,
-#                src_out_file=qags_src_file,
-#                gen_out_file=qags_trg_file)
+compute_correlations_with_human(turk_files=exp_d[gen_mdl],
+                                ref_file=exp_d["ref"],
+                                hyp_file=exp_d["hyp"][gen_mdl],
+                                mdl=gen_mdl,
+                                qags_src_file=qags_src_file,
+                                qags_trg_file=qags_trg_file,
+                                n_qsts_per_doc=n_qsts_per_doc
+                                )
+
+if src_inp_file and trg_inp_file:
+    inspect_qas(src_inp_file=src_inp_file,
+                gen_inp_file=trg_inp_file,
+                src_out_file=qags_src_file,
+                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
