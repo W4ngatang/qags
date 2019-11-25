@@ -28,7 +28,7 @@ task_queue = Queue()
 onboarding_tasks = {}
 onboarding_conv_ids = []
 blocked_workers = []
-ONBOARD_FAIL_MSG = 'Did not pass onboarding'
+BLOCKED_MSG = 'Did not pass onboarding'
 SHORT_RESPONSE_MSG = 'Provided reason is too short'
 SHORT_TIME_MSG = 'Failed quality control'
 FAIL_ATTN_MSG = 'Failed quality control task'
@@ -540,7 +540,7 @@ def check_work(mturk_manager, data_handler, save_data,
         # auto-fail workers who didn't pass onboarding
         if worker_id in blocked_workers:
             print(f"\tWorker {worker_id} is (soft) blocked")
-            fail_msg = ONBOARD_FAIL_MSG
+            fail_msg = BLOCKED_MSG
 
         # fail workers who worked implausibly quickly
         if short_msg_flag:
@@ -570,7 +570,7 @@ def check_work(mturk_manager, data_handler, save_data,
         else:
             # pay out bonus
             curr_time = datetime.now()
-            request_tok = f"{worker_id}-{curr_time.strftime('%m%d%H%M')}"
+            request_tok = f"{worker_id}-{curr_time.strftime('%m%d%H%M%S')}"
             #mturk_manager.pay_bonus(worker_id=worker_id,
             #                        bonus_amount=bonus_amount,
             #                        assignment_id=asgn_id,
@@ -667,14 +667,21 @@ def main(opt, task_config):
         print(f"Logging bad workers in {opt['bad_worker_file']}.")
         if os.path.exists(opt['bad_worker_file']):
             with open(opt['bad_worker_file'], 'r') as bad_worker_fh:
-                workers_to_block = [worker.strip() for worker in bad_worker_fh]
+                workers_to_block = list(set([worker.strip() for worker in bad_worker_fh]))
             print(f"\tLoaded {len(workers_to_block)} bad workers from {opt['bad_worker_file']}.")
         else:
+            workers_to_block = list()
             print(f"\tNo previous bad workers from {opt['bad_worker_file']}.")
         bad_worker_fh = open(opt['bad_worker_file'], 'a')
     else:
         workers_to_block = list()
         bad_worker_fh = None
+
+    if opt['ok_worker_file'] is not None and not opt['is_sandbox'] and os.path.exists(opt['ok_worker_file']):
+        with open(opt['ok_worker_file'], 'r') as worker_fh:
+            workers_to_allow = list(set([worker.strip() for worker in worker_fh]))
+        print(f"\tLoaded {len(workers_to_allow)} ok workers from {opt['ok_worker_file']}.")
+
     if opt['bonus_file'] is not None:
         bonus_fh = open(opt['bonus_file'], 'a')
         print(f"Logging bonuses awarded to {opt['bonus_file']}.")
@@ -691,8 +698,12 @@ def main(opt, task_config):
                     blocked_workers.append(worker_id)
                 except:
                     print(f"Failed to block {worker_id}")
+        if opt['is_sandbox']:
             mturk_manager.un_soft_block_worker(ALEX_ID)
 
+        if opt['ok_worker_file'] is not None and not opt['is_sandbox']:
+            for worker in workers_to_allow:
+                mturk_manager.un_soft_block_worker(worker_id)
 
         # Set up the sockets and threads to recieve workers
         mturk_manager.ready_to_accept_workers()

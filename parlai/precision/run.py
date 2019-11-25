@@ -16,11 +16,12 @@ def set_args():
     out_file = f"{curr_time.strftime('%m%d%H%M')}.mturk_data.jsonl"
     bonus_file = f"{curr_time.strftime('%m%d%H%M')}.bonuses.csv"
     args['out_file'] = f'{out_dir}/{out_file}'
-    args['bad_worker_file'] = f'/home/awang/projects/qags/data/mturk/bad_workers.txt'
+    args['ok_worker_file'] = f'/home/awang/projects/qags/data/mturk/ok_workers.11211035.txt'
+    args['bad_worker_file'] = f'/home/awang/projects/qags/data/mturk/bad_workers.11211035.txt'
     args['bonus_file'] = f'{out_dir}/{bonus_file}'
 
     args['dialogs_path'] = '/home/awang/projects/qags/data/mturk/summary'
-    shard_n = 5
+    shard_n = 6
     args['model_comparisons'] = [
                                  #(f'src_para_nex5_randorder_shard{shard_n}', f'bart_sent_nex5_randorder_shard{shard_n}'),
                                  #(f'src_para_nex5_randorder_shard{shard_n}', f'bus_sent_nex5_randorder_shard{shard_n}'),
@@ -60,7 +61,7 @@ def set_args():
     args['annotations_per_pair'] = 3
 
     # TODO(Alex): CHANGE ME!!!
-    args['is_sandbox'] = True
+    args['is_sandbox'] = False
     args['qual_percent_hits_approved'] = 98
     args['qual_n_hits_approved'] = 1000
     args['min_time_threshold'] = 30

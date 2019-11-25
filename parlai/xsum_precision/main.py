@@ -691,14 +691,14 @@ def main(opt, task_config):
         mturk_manager.start_new_run()
 
         # (Soft) block bad workers
-        if opt['bad_worker_file'] is not None and not opt['is_sandbox']:
+        if workers_to_block:
             for worker_id in workers_to_block:
                 try:
                     mturk_manager.soft_block_worker(worker_id)
                     blocked_workers.append(worker_id)
                 except:
                     print(f"Failed to block {worker_id}")
-        elif opt['is_sandbox']:
+        if opt['is_sandbox']:
             mturk_manager.un_soft_block_worker(ALEX_ID)
 
         if opt['ok_worker_file'] is not None and not opt['is_sandbox']:

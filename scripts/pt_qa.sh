@@ -158,42 +158,39 @@ function predict_extractive() {
     qg_ckpt="best"
     n_ans=10
     n_qsts=10
-    dataset="cnndm"
+    dataset="xsum"
     subset="random1000-${n_ans}ans"
     tmp="${dataset}-${subset}"
     qg_model="qg-newsqa-ans"
+    use_all=0
     beam=10
     topk=0
     topp=0
-    gpu_id=7
+    gpu_id=1
 
-    #for gen_mdl in bus-subset fan-subset pgc-subset; do
-    for txt_fld in gen src; do
+    for txt_fld in src_w_trg gen src; do
+    #for txt_fld in gen; do
         #for qst_src in gen src; do
         for qst_src in gen; do
-            #gen_mdl="pgc-subset500"
-            #out_dir="/checkpoint/wangalexc/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}/${gen_mdl}"
             out_dir="${ckpt_dir}/${tmp}/bart"
             mkdir -p ${out_dir}
 
-            #pred_file="/private/home/wangalexc/projects/qags/data/${gen_mdl}/qst-${qst_src}.cnndm-${txt_fld}.json"
-            #pred_file="/private/home/wangalexc/projects/qags/data/subset500/${gen_mdl}/qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
-            #pred_file="/private/home/wangalexc/projects/qags/data/xsum/random1000/qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
-            #pred_file="/home/awang/projects/qags/data/xsum/random1000/qst${n_qsts}-${qst_src}.${dataset}-${txt_fld}.json"
-            #out_file="${out_dir}/prd.qst${n_qsts}-ckpt${qg_ckpt}-${qst_src}.cnndm-${txt_fld}.json"
-            if [ ${topk} -gt 0 ]; then
+            if [ ${use_all} -eq 1 ]; then
+                # TODO(Alex): beam actually can vary
+                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qstall-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.qstall-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
+                echo "Predicting for all questions!"
+            elif [ ${topk} -gt 0 ]; then
                 pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
                 out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
             elif [ ${beam} -gt 0 ]; then
-                #pred_file="/home/awang/projects/qags/data/xsum/random1000-5ans/qst${n_qsts}-${qst_src}-beam${beam}.${dataset}-${txt_fld}.json"
-                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}-reverse/qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-beam${beam}-reverse.${tmp}-${txt_fld}.json"
+                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst_w_ans${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.qst_w_ans${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
             else
                 pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
                 out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
             fi
 
-            # NOTE(Alex): maybe need --version_2_with_negative \
             python finetune_pt_squad.py \
               --local_rank ${gpu_id} \
               --bert_model ${bert_version} \
