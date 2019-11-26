@@ -1,0 +1,2498 @@
+{
+ "00d2b5f28352bfc337f5a04dcafe2281c7cc27ea": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "manchester city's tenacious, creative and james milner could leave as a free agent."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "best players are currently set to leave their premier league clubs."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "tremmel has played second fiddle to michel vorm and lukasz fabianski."
+   },
+   "3": {
+    "label": "Incorrect",
+    "text": "johnson is on a bumper deal at anfield this summer."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "many clubs will be looking to snap up a bargain free transfer."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "focus is now turning to the summer transfer window."
+   }
+  }
+ },
+ "02492e98beb7cfc824779a02b919d8d94a00f606": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Incorrect",
+    "text": "gold coast council approved new planning powers."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "there are more than 700 party houses across the city."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "new powers approved by deputy premier and planning minister jackie trad."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "tough new regulations will allow for a crackdown on the gold coast."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "tough new regulations will allow for a crackdown on notorious party houses."
+   }
+  }
+ },
+ "09e7742682729a9fb220701764b6a3c2430abd92": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "jodie bredo, 26, has been a professional kate middleton lookalike."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "jodie bredo has been a kate lookalike for six years."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "miss bredo admits she does not fancy prince william."
+   },
+   "3": {
+    "label": "Incorrect",
+    "text": "she often does jobs with a prince harry more."
+   },
+   "4": {
+    "label": "Incorrect",
+    "text": "jodie is expecting her second child: 'kate's just too frumpy for her age'"
+   },
+   "5": {
+    "label": "Correct",
+    "text": "the royal mother dresses 'too boring' for her age."
+   }
+  }
+ },
+ "0a2693ea6d1d636b7961b9df51d14d0aa6cc0885": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "detectives have issued a photo of a brown haired, caucasian male wearing a black top."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "dandenong fire was one of a string of suspected arson attacks on three melbourne catholic churches."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "detectives are yet to determine the cause of the fire."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "church is said to be the site of child sex attacks perpetrated by kevin o'donnell."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "police have released a face image of a man that may be able to assist with their enquiries."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "police have released an image of a suspected arson attack on a melbourne church."
+   },
+   "6": {
+    "label": "Correct",
+    "text": "emergency services called to a fire at st mary's catholic church in dandenong."
+   }
+  }
+ },
+ "0dfd0df01aeeeec0f50a20c1e0a657e2edce9a1e": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "australia head coach michael cheika aware his pack is being written off for the world cup."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "cheika's side will face england and wales in crunch pool games."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "england's pack demolished australia at scrum-time during last november."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "matt giteau could be a glorious asset at the showpiece tournament."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "the national coach refuses to bite back, but he has evidently noted."
+   }
+  }
+ },
+ "0e876b028c3cf0a0ce6c16d18382b1a78102748e": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the incident took place in princess anne - a community of 3,260 in somerset county, maryland."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "princess anne police told daily mail online that no foul play was suspected."
+   },
+   "2": {
+    "label": "Incorrect",
+    "text": "eight children between ages six and 16 were found dead from carbon monoxide poisoning."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "tynijuiza todd, 15, and her 12-year-old sister tykira are believed to have perished in the carbon monoxide accident."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "a maryland father and his seven children were discovered dead monday afternoon."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "tynijuiza todd and all of her sisters perished in carbon monoxide poisoning."
+   },
+   "6": {
+    "label": "Correct",
+    "text": "relatives have identified the adult victim as father of seven rodney todd sr."
+   }
+  }
+ },
+ "11f099bfd80586ed3efa70948f7b48a2def95532": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the biggest myth associated with victim blaming is that women are 'asking for it'"
+   },
+   "1": {
+    "label": "Correct",
+    "text": "initiative aims to stamp out suggestion that a woman can be blamed for her attack."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the campaign has produced over 2,000 photographs of 200 women."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "new campaign from rape crisis london has captured hundreds of women across london."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "new london based campaign wants to see this myth abolished for good with #thisdoesn 'tmeanyes movement'"
+   },
+   "5": {
+    "label": "Correct",
+    "text": "the images were shot by photographer perou in braithwaite tunnel."
+   }
+  }
+ },
+ "1206966b68cae5d31776e94fe23e9082930b1daa": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "batman v. superman: dawn of justice just got a makeover."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the trailer went up late on friday, youtuber bobby burns."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "cnn spoke to 18-year-old burns about what motivated him to make his video."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "instead of ben affleck and henry cavill facing off, this version wonders what it would be like if comics' classic characters adam west."
+   }
+  }
+ },
+ "12350f904476c7aa825acc65c2fcbecde30a4ff2": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the vatican are training up ordinary doctors, teachers and psychologists."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the course is help would-be exorcists distinguish demonic possession from psychological or medical conditions."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "experts say demonic activity is on the rise due to an in creased interest."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "more than 40 years after the exorcist left cinema audiences green."
+   }
+  }
+ },
+ "12670e6af0ccf95cf8de50f651f0fded33d419b0": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "kim kardashian has launched an outspoken attack on obama for refusing to use the word 'genocide'"
+   },
+   "1": {
+    "label": "Incorrect",
+    "text": "he said it was 'very disappointing' that he stopped short of using word."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "she has used her celebrity since 2011 to bring awareness to the genocide."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "president obama sent an administration official to mark the 100th anniversary of the 1915 massacre."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "kim and khloe kardashian laid flowers at the dzidzernagapert armenian genocide monument."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "historians estimate that 1.5 million armenians were killed by ottoman turks."
+   }
+  }
+ },
+ "1c65bbeb5b1ca9a37d4f0a428ed4e99751065a58": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "goldfish weighing up to 2kg are some of the exotic aquarium fish invading."
+   },
+   "1": {
+    "label": "Incorrect",
+    "text": "goldfish are being caught weighing up to 2kg and one metre in length."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the native fish in the region are only up 10cm."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "fish are much larger than the native fish, so they prey on them and compete for habitat."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "koi carp weighing up to 8kg."
+   }
+  }
+ },
+ "1d9605b67a97629a24796403fdecc797edb25c0b": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "australia's biggest venomous snake has produced a huge lethal shot for reptile wranglers."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the toxin is enough to fill a shot glass and 40 times the amount of a brown snake."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "four-metre long king cobra raja has delivered 500 milligrams of deadly toxin."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the four-metre long king cobra has delivered almost 500 milligrams of deadly toxin."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "australia's biggest venomous snake has produced a huge lethal 'shot'"
+   }
+  }
+ },
+ "1e50ee6085cbcb8a58cad30d2883078acb1508fe": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the pilot scheme will be based in microsoft's redmond offices."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "scheme will begin by recruiting 10 people with autism or asperger syndrome."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "if successful, it could extend to more vacancies worldwide."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "microsoft is running the scheme with support from specialisterne."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "autism is a neurological disorder that affects how a person communicates."
+   }
+  }
+ },
+ "1fdb50e2b3eb57ad573b7e82bcfb1203cecb5808": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the korean demilitarized zone is next to a burgeoning surf spot for south korean hipsters."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the dmz was established in 1953 as a buffer zone to separate the north from the south."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "photos captured at the site show an eclectic mix of people going about their duties."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "shannon aston, from new zealand, said he felt compelled to start photographing the area."
+   }
+  }
+ },
+ "206a99253dafc0701ad7e707dc8648c1fe6cce92": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "bournemouth are set to hold off on expanding capacity of 12,000-seater goldsands stadium."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "away contingent currently crammed into a corner of the ground between the south stand and the east stand."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "premier league rules state clubs must give away fans 10 per cent of their overall allocation."
+   },
+   "3": {
+    "label": "Incorrect",
+    "text": "eddie howe prefers the goals to give his players a psychological advantage."
+   }
+  }
+ },
+ "276accccc393a99e52e7385b4c15502eb090ef8b": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "has spent most of her life collecting pokemon memorabilia of all shapes and sizes."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "lisa's mother had to move to the smallest room for her daughter's collection."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "now holds the guinness world record for the largest collection of pokemon items."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "lisa courtney, of hertfordshire, has spent most of her life collecting memorabilia."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "her fixation with the japanese characters started at the age of nine."
+   }
+  }
+ },
+ "2ad2336812f11311087484a9be095aa0e9c54f32": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "floyd mayweather and manny pacquiao are in las vegas."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the most expensive seat on sale through the website was retailing for a mammoth $ 128,705 but has since skyrocketed."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "tickets were released last thursday."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "most of the tickets for the highly-anticipated clash have sold out."
+   }
+  }
+ },
+ "2b8222de8ec89c355627ccc8a14f08f1cb70c4ae": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "kane has been nominated for pfa player of the year."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "kane deserves to win the award for his impact on english football."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "mauricio pochettino believes harry kane deserves to pip eden hazard."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "two forwards are the leading contenders to scoop the pfa accolade."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "hazard is the red hot favourite to land the prize after his season with chelsea."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "kane could become the first spurs player to score 30 goals in a season."
+   }
+  }
+ },
+ "2b902ec3bc744315a6842fed9ec223f5675fcbaf": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "john loughrey takes a nap outside the lindo wing in paddington."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "police were watched by a small but growing group of royal fans."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "john loughery, 60, was the only member of the public to attend every day."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "he said he wouldn't be surprised 'if a portrait of me is hanging inside kensington palace in 100 years'"
+   },
+   "4": {
+    "label": "Correct",
+    "text": "kate's due date is just over three days away."
+   }
+  }
+ },
+ "2bcfc319d2c4a8358d2fa0034027009a4368a2ae": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Incorrect",
+    "text": "new york-based writer danielle page set out to dispense their best advice."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "danielle page set out to ask every cabbie she came across."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "michael revealed that his trick to marital bliss is putting his wife's happiness above his own."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "another driver firmly believes that people should allow their partners to change."
+   }
+  }
+ },
+ "2c664436d54833bd48e72b30f89b290669afd467": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "iceland has been used in filming as far back as 1920, well-known fantasy, sci-fi and action film directors and producers have all descended on the island nation as"
+   },
+   "1": {
+    "label": "Incorrect",
+    "text": "fans will likely recognise the battle of the hound and brienne."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "thingvellir national park provided the location for the north of westeros."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the country's many stunning glaciers translate beautifully to the silver screen."
+   }
+  }
+ },
+ "2cf4d280b8ae03814e0789b39336dd277789d616": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "it marks the end of a six-year case."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "josi harrison and hailey walden were all in eighth grade when they claim their high school-age boyfriends lured them into sending nude pictures to their phones."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "hailey walden, now a straight-a student, left clatskanie middle school to escape the harrowing experience."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "they were told they would be charged with creating and distributing pornography."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "laura lefebvre and josi harrison have won a civil claim against their school district for failing to support them."
+   }
+  }
+ },
+ "39553f1871b87d88d22bd3a1dd938b0142ced6ca": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "dermatologist dawn marie davies warns sunbed users could be putting themselves at risk."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "genital herpes highly contagious and spreads from one person to another via skin-to-skin contact."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "once a person is infected with the virus it can reactivate every so often cause a new episode of painful genital herpes."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "those compelled by a desire for bronzed skin are also at risk of catching a sexually transmitted infection."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "experts warn the disease is not the only health danger associated with an artificial year-round tan."
+   }
+  }
+ },
+ "399c9461a7a40e526ce640c6945ffd956cbcbaf5": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "its air defense directed energy on-the-move program."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "system will be able to spot and track drones out of the sky using a 30kw laser."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "once drones are spotted, it can shoot them out of the sky."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "some of the system's components already have been used in tests."
+   }
+  }
+ },
+ "39dc9db4a1539a7d0d8531e37a10f3d885edb40b": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "adams has no intention of following her former great britain team-mate natasha jonas."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "adams will return to an english ring for the first time since her london 2012 triumph."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "adams insists she has absolutely no plan to set a time-scale on when it will be time to hang up her golden gloves."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "nicola adams is hoping to become a double olympic gold medallist."
+   }
+  }
+ },
+ "3a1e0d107b1d59dc0ed9c6279a1be0f5e404e221": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "scots guard shaun smith, 25, can be seen stamping 18 times on his head."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "jason collins, 22, rained blows with his fists on to the man's body."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "soldiers were expected to be jailed for 'deeply unpleasant and inexcusable' assault."
+   },
+   "3": {
+    "label": "Incorrect",
+    "text": "collins was described as an 'angel' in court by his officer."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "judge at teesside crown court made what even he admitted was an 'extraordinary' decision."
+   },
+   "5": {
+    "label": "Unclear",
+    "text": "cctv cameras captured horrifying attack in black jeans and punched two men."
+   },
+   "6": {
+    "label": "Correct",
+    "text": "two soldiers, one a buckingham palace guard, walked free from court."
+   }
+  }
+ },
+ "3ad0320476e8dda3a00604efdcf766e91766c815": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "gov. mike pence says the state will fix the religious freedom act."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "pence: pence is making the right call."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "in general, it is a good thing for society to shape its laws in ways that allow people to live their lives consistent with their sincerely held religious obligations"
+   },
+   "3": {
+    "label": "Correct",
+    "text": "indiana's rfra is to add one amendment, one easy line codifying that discrimination against the lgbt community is harmful."
+   }
+  }
+ },
+ "3e2e4cc7840b515231acb839c0225afe3a8e5971": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the brothers of sex offences are five times more likely than average to commit similar crimes."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "research analysed dna from 21,566 men convicted of sex offences in sweden."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "sons of convicted sex offenders were four to five times more likely to be convicted of sex crimes than men in the general population."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "in only 2 per cent of cases could this familial connection be explained by shared environmental factors."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "implication is that the potential for committing a sex offence may be written in our genes."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "the genes that make up the people who are raised cannot be considered independently of each other."
+   }
+  }
+ },
+ "416821747f98b6de1e41355910d68b49e12bc364": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "sam bennett has revealed the extent of the shocking injuries he sustained."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "24-year was taken to hospital after the crash in belgium on monday."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the former netapp-endura racer was in contention to improve his fifth-place finish in 2014."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "bora-argon 18 rider was involved in a mass pile-up in the final kilometre."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "sam bennett reveals his injuries to his shoulder after crashing at the scheldeprijs one day classic."
+   }
+  }
+ },
+ "43d83fac62758f49b7bb23f2dc943580553c3591": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "pacquiao says he has to fight floyd mayweather like it is the last of his life."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "filipino has been installed as the underdog for the mega-fight in las vegas."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "manny pacquiao is convinced he will have to be a warrior against floyd mayweather."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the wbc title belt will be presented to pacquiao or mayweather at the mgm grand."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "he says he must be a 'warrior in the ring'"
+   }
+  }
+ },
+ "4484750d5a5298f190f17cdadc2720b9729efec1": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "holly nicole, 31, has pleaded guilty to aggravated assault."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "holly nicole solomon admitted to running over her husband daniel in a mesa parking lot."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "solomon, who was six months pregnant at the time, will serve three and a half years in prison."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "she is said to have chased him down with the suv, according to the arizona republic."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "solomon had been slamming the door of her jeep repeatedly while yelling at her husband."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "an arizona woman has pleaded guilty to hitting her husband with their suv."
+   }
+  }
+ },
+ "44c79b2a86076c9d3ff9a363c10e7478868ea8b7": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "maggie rizer donned a string bikini while playing with son quinnlyn clancy."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "online commenters couldn't help but note how fit maggie looks."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the 37-year-old shared this picture to announce the birth of her third child and first daughter on february 9."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "she posed with her two-year-old son quinnlann clancy for a sweet snapshot."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "maggie rizer only gave birth to her daughter cecilia kathryn nine weeks ago."
+   }
+  }
+ },
+ "47312d43c3adbfd8a713020d7e96ad08646a3004": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the visit was part of willem-alexander's 48th birthday celebrations."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "koningsdag - or king's day - is a public holiday in the netherlands."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "it was the turn of dordrecht, a city in the south-west of the country."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "dutch royal couple were all smiles as they meet well-wishers."
+   }
+  }
+ },
+ "4b7d9dff37e0fbdbd1f7386001fbaeca4fa3fed8": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "tebbit has hit out at david cameron for not being a 'real man'"
+   },
+   "1": {
+    "label": "Correct",
+    "text": "lord tebbit criticised cameron's tactics in playing up the threat of a labour-snp government."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "former tory party chairman said unlike major figures such as sir winston churchill."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "lord tebbit launched an astonishing attack on david cameron claiming the pm has never had a proper job before entering politics."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "he said the prime minister had done nothing except a special adviser."
+   }
+  }
+ },
+ "4d6062e9f2c65936045622d8dd469651c54f383a": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "manchester city are preparing to table a mega-bid for raheem sterling."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the reigning barclays premier league champions have made the liverpool forward a primary target."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "man city are planning a mega-bid to sign raheem sterling when the transfer window reopens."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the club plan to make a formal offer for the forward."
+   }
+  }
+ },
+ "4e0259bc8719e23ae82fb54f1c3d39f639c11522": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "leicester have appeared doomed to the bottom of the table."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "vardy scored an injury-time winner to improve his side's slim chance of survival."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "vardy struck past west brom goalkeeper boaz myhill."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "leicester's premier league forecast has looked gloomy for some time."
+   }
+  }
+ },
+ "515b5abb01fa23aa87ae475d0cde3fe8529605ca": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Incorrect",
+    "text": "ben, now 34, and baby hazel, 3 months, were married in caledonia, michigan."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "shelby's version was lodged in her spine instead of her brain."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the rest was treated with a combination of chemo and radiation."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "ben was slated for a clinical trial with an experimental drug."
+   }
+  }
+ },
+ "539d909e3b49ee58471494bafe5b2c716c55675c": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "fritz the golden retriever from california appears to lack any eye-mouth co-ordination."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the pooch was filmed wearing bunny ears this easter trying to catch a hard-boiled egg."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "despite his best efforts, the egg narrowly misses his jaw, bounces off his chest and hits the grass."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the pup has made a name for himself with his poor catching skills."
+   }
+  }
+ },
+ "5450daad3b6e8ec9bec1301dd830877a571df9d4": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the son of gerry anderson has criticised the computer-generated remake."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "thunderbirds will return to our screens tonight 50 years after the futuristic puppet show."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the jerky puppets rescued the world from all kinds of disaster."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "jamie anderson said the characters did not have the same charm as the 'lovingly detailed' miniature puppets."
+   },
+   "4": {
+    "label": "Incorrect",
+    "text": "thunderbirds aired in the uk between 1964 and 1966 and 2002."
+   }
+  }
+ },
+ "5523d2047607f97a4d253013e4ceb2fc79e8f9fd": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the event was an attempt at breaking the record for thousands of youngsters."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "parents raced into the field armed with baskets of their own."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "children as young as two were pushed to the ground as adults invaded children-only event."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the world's biggest easter egg hunt in sacramento became shambolic on sunday."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "chaos erupted at an easter egg hunt."
+   }
+  }
+ },
+ "58a9dbc76da984afd5cbaa5c9bc9b59b36c302ab": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the vast majority of australians will not get a day off this anzac weekend."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the agreement was designed to provide uniformity of public holidays across the nation."
+   },
+   "2": {
+    "label": "Incorrect",
+    "text": "the queen's birthday or labour day fall on a weekday."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the head of the immgration department declared a public holiday for 8,500 staff."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "no public holiday is triggered when anzac day falls on saturday."
+   },
+   "5": {
+    "label": "Incorrect",
+    "text": "bosses in some states have been warned to expect a rise in employees."
+   }
+  }
+ },
+ "5922bab789a2f80257a6a0735b31f670e5062f14": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "former arsenal flop nicklas bendtner was not included in the squad."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "denmark international was due to start the match but ended up being dropped."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "wolfsburg boss probably didn't need an invitation to lose his temper."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "bendtner was dropped from the wolfsburg squad for sunday's game."
+   }
+  }
+ },
+ "5a6c0fe6a8e12bad310bb4fa953d4f137d7016a0": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "yom hazikaron is held the day before israel's independence day."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "under law all places of entertainment, including cinemas, theatres and nightclubs are closed."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "soldier salute and visitors stand still at the mount herzel military cemetery."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "an woman places a red rose at a commemorative plaque honouring fallen soldiers."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "israel marked its annual day of remembrance for fallen troops and slain civilians."
+   }
+  }
+ },
+ "5d7486f9410b5a2c3723da50d11a86c6d249287d": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "amedy coulibaly killed four and taking others captive before being shot dead."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "cherif kouachi shot 12 people at the offices of satirical magazine charlie hebdo."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "police storm the hyper cacher jewish supermarket in hail of gunfire."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "patrick klugman, a lawyer representing the six survivors, said images 'lacked the most basic precautions'"
+   },
+   "4": {
+    "label": "Correct",
+    "text": "six hostages who hid in a supermarket freezer have sued french media."
+   }
+  }
+ },
+ "5d85833bfcb8c98876a46298f95350741231c7dd": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "carrick has been instrumental in manchester united's recent run of good form."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "louis van gaal has been impressed by carrick's contribution at old trafford."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "louis van gaal impressed with carrick's contribution to the team."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "van gaal has identified borussia dortmund's ilkay gundogan."
+   },
+   "4": {
+    "label": "Incorrect",
+    "text": "manchester united have begun the search for michael carrick."
+   }
+  }
+ },
+ "627a0869ff33602986bc864c961b795d5babf5bd": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "hillary so much she made it into his obituary."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the family of 81-year-old larry upright added the political message."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the north carolina man's obituary asked two things of friends and family: instead of sending flowers for the funeral."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "she says that recollection prompted his family to ask readers to reject clinton's presidential bid."
+   }
+  }
+ },
+ "63265840c7cbe533e11cce335ef03727af611af3": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "over half, 54 per cent, also confessed they did not know lyme disease."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "knowledge about lyme disease is increasing and it is known to wreck lives."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "almost half of dog owners did not know that ticks can transmit deadly diseases."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "vets are urging public to get their dogs checked out for ticks."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "in extreme cases, the nervous system, joints and heart can be affected."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "vets are urging the public to get dogs checked out for ticks."
+   }
+  }
+ },
+ "65cafde01954d1cb410deb9f6e9f9a724fd59fc1": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "manchester united's unpopular owners have lifted the lid on how they run the club."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the man has written an enlightening account of his time with the manchester united chiefs."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "tehsin nayani's book, 'the glazer gatekeeper: six years speaking for manchester's silent owners'"
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the takeover of manchester united was met with huge protests in 2004."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "glazer family, tehsin nayani, has written the 'glazer gatekeeper'"
+   },
+   "5": {
+    "label": "Incorrect",
+    "text": "nayani claims that the glazers did not sell cristiano ronaldo to real madrid."
+   }
+  }
+ },
+ "66a896dd84f6acca1d4dd190a0affa696e0312f6": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "karen catherall was viciously beaten and strangled to death by darren jeffreys."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "pair had been drinking at the pub before she returned to her home."
+   },
+   "2": {
+    "label": "Incorrect",
+    "text": "he only called paramedics the following morning and claimed he was sleeping."
+   },
+   "3": {
+    "label": "Incorrect",
+    "text": "karen catherall, 45, was jailed for a minimum of 17 and a half years in february."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "police have since told the family she made a 999 call from her mobile."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "family of a murdered mother have spoken of their fury after it was revealed."
+   },
+   "6": {
+    "label": "Correct",
+    "text": "her mother, glenys keir, 74, and sister lorraine humphreys, 49, have slammed bt for not taking action."
+   },
+   "7": {
+    "label": "Correct",
+    "text": "operators connects both mobile and landline numbers with the requested emergency service."
+   }
+  }
+ },
+ "66be954d6c99b1b3f6a48adc0bfd8760734ad917": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "manchester city's hopes of retaining the premier league title."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "glenn murray fired the eagles ahead on 34 minutes."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "manuel pellegrini will struggle to defend his city players."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "yaya toure scored one back for the visitors but wasn't enough to stop city."
+   }
+  }
+ },
+ "6f803d6f6bec7d862ed14b063fea4badc6f229ab": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "charlene bishop, 17, went to feed her pony taffee on wednesday."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "her mother danielle flisher went to investigate and found the shetland lying on the floor."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "left eye was battered out of its socket and concrete was embedded in her brain."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the left eye was battered outs of its socket and concrete embedded in her brain."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "taffee the shetland pony was battered to death with a breeze block."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "the pony has been battered to death with a breeze block in the middle of the night."
+   }
+  }
+ },
+ "73e54afb79336bfa97290fc2bcdaf3d2a3560b51": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "downton was fired by new ecb chief executive tom harrison."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the decision to sack a man who has endured a traumatic 14 months."
+   },
+   "2": {
+    "label": "Incorrect",
+    "text": "kevin pietersen oversaw the sacking of alastair cook as one-day captain."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "paul downton has left his role as managing director of england and wales."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "english cricket's new bosses flexed their muscles when paul downton paid price."
+   }
+  }
+ },
+ "7408e6418b4629220489452532a4ab98ced1d614": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "beatrice tollman made her most recent donation to the tories earlier this month."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "she has been charged with conspiracy to evade millions of dollars in tax before the charges were dismissed."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "he was sentenced to more than two years in prison."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "stanley tollman pleaded guilty to tax evasion."
+   }
+  }
+ },
+ "76aa838eee8313af7ca5d311130b3390f3a27df8": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the group of tourists exploring the activities on offer in the country's napo province."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the creative prank was executed by the ecuadorean airline tame, ecuador's ministry of transport and public works."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the video sparked a diplomatic incident with the costa rican government."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the publicity stunt saw tourists enjoy white water rafting, swimming near waterfalls and hiking."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "the ecuador tourist board saw it fool a group of 40 visitors."
+   }
+  }
+ },
+ "78ff802af1cd66e66c019741ba57859d359b03f4": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "hayley carney will undergo surgery to complete her gender transition."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "she will then have six months to apply for a marriage visa."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "she has been dreaming of a life in britain since reading books."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "she is preparing to move to the uk to marry a bride."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "american hayley carney hopes to fulfil a 'lifelong dream'"
+   }
+  }
+ },
+ "7ac458cba99c85051d3fc85b8bc89af2ffaa9343": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "' i love you': the mysterious signs that have appeared in the surrey village of milford."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "signs have sparked speculation across the village as to the identity of the author."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "one hapless romeo or juliet they decided a public declaration of their love was the only way to seek forgiveness."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "written in black marker pen pen this series of mysterious cardboard signs."
+   }
+  }
+ },
+ "7b66c817e36020bd6e9bc9928d89fe7b0cec0db8": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Incorrect",
+    "text": "video shows all white officers treat suspects 'on basis of color'"
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the footage has gone viral on social media."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "he was pulling out of lexington county courthouse on wednesday to make a left turn."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "a young african-american man has released a video disputing claims that all white police officers treat suspects on the basis of their color."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "mr stack recounts his own experience with a 'caucasian officer'"
+   },
+   "5": {
+    "label": "Correct",
+    "text": "the alleged racial profiling of suspects by police hit the headlines against last week."
+   }
+  }
+ },
+ "7baee38ce0b4663e9bd0c006f5b1803c58d314c8": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the shepard system will take astronauts to space on suborbital journeys."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the new shepard spaceship is designed to fly three people and payloads to altitudes 62 miles above earth."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "it will launch from blue origin's west texas facility near van horn."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the firm expects to begin flight tests this year."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "testing and development of the rocket engine, called be-3, has been completed."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "a space company owned by amazon.com founder jeff bezos."
+   }
+  }
+ },
+ "7c0d2467986e4e8cf55269e7d3b7e8cfa44b1abd": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the casket of promising basketball player lauren hill has been moved into the 10,000-seater arena."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "she was diagnosed with a rare form of inoperable brain cancer."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "she was told she would not live past december but died four months later."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "hill was diagnosed with diffuse intrinsic pontine glioma after she became dizzy."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "lauren hill died of an inoperable brain tumour this month."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "lauren hill was diagnosed with a brain tumour which was inoperable."
+   },
+   "6": {
+    "label": "Correct",
+    "text": "doctors found the tumour just after the teenager's 18th birthday."
+   }
+  }
+ },
+ "7cbdeb643ee253859f346802319d630a8be326af": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "a campaign video sees dr vivek murthy and the sesame street favourite go through the process."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "elmo and dr murthy questions why everybody does not get a shot."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "murthy compares getting vaccinated to using an umbrella when it rains."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "surgeon general vivek and elmo explain why getting vaccinated is crucial."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "the u.s surgeon has enlisted elmo to urge american children to get vaccinated."
+   }
+  }
+ },
+ "855510d438976501750feec5164a6cb741005ff5": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "one in five admit to doing a spot of online shopping in bed at night."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the nocturnal shopping sprees are likely down to the 86 per cent of those surveyed."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "this is the least of stealthy shopper habits."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "more than 27% of australians confess to shopping online at work."
+   }
+  }
+ },
+ "898b88e2203db0ec0a8bb811bbb24bcfd8d1be7a": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "jihadists were caught as they made the final leg of their journey."
+   },
+   "1": {
+    "label": "Incorrect",
+    "text": "three men and four children were detained by soldiers at a checkpoint in ogulpinar."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "it is believed the youngest of the children is two and the eldest is 11."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "turkey is key staging ground for foreign fighters attempting to reach is-controlled areas of syria and iraq."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "nine british nationals arrested trying to enter syria illegally."
+   }
+  }
+ },
+ "8ae70a71c7157fdd553c4cb8930d759982de174d": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "susie clark, of evening shade, found the 3.69-carat white diamond in a 37.5-acre search field."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "clark plans to keep the pinto-sized diamond, which is the largest diamond of the 122."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "susie clark found a white diamond on a search field at crater of diamonds state park in arkansas."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "she spotted the diamond sticking out of a ridge of plowed dirt."
+   }
+  }
+ },
+ "8ba5777dc7f6b5939f709a77f91fef2cda9e07d4": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "experts, including columbia university professor tim wu."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "comcast is planning to 'walk away' from the deal rather than fight it out."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the move comes after federal communications commission decided that merger wasn't in the public interest."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the $ 45.2 billion deal would have merged comcast's 30million customers."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "comcast and time warner cable declined to comment on thursday."
+   }
+  }
+ },
+ "8cf13da278a0f689d07209d22f8b85e57ded3147": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Incorrect",
+    "text": "capel path, ridden by ryan moore and sir michael stoute."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the richard hughes-ridden daughter of royal applause was closing hard on winner."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "queen looked like she was enjoying her day out at newbury."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the queen crossed her fingers for the race but only managed to come close."
+   }
+  }
+ },
+ "90de020a8c992ae4f39928895a33e885164cdf5b": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "leeds-based line is running a competition called #everydayfix."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "products were designed as part of the direct line everyday fix design makeathon."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "you can vote on which one is your favourite, and the winner will be made into an actual product."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "groups from london-based design company makerversity asked to design products that could alleviate certain emergencies."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "they asked people to pick their top ten 'everyday emergencies'"
+   }
+  }
+ },
+ "918824ad583459c100e2d407efd66d2aea4f0450": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "gareth bale adamant he wants to stay at real madrid."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "bale is injured and out of wednesday's euroderby ii showdown."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "bale has scored 17 goals for real this season."
+   },
+   "3": {
+    "label": "Incorrect",
+    "text": "click here for all the latest manchester united news."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "gareth bale is determined to win over some of the hardest."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "real madrid's # 86million player is hoping to be back in time for the champions league."
+   }
+  }
+ },
+ "95c9accc2a1856e7979ebc5366008ca4f89e0720": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Incorrect",
+    "text": "these days we are increasingly using outdoor space for tending flowers."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "almost 40 per cent of people spend more time sunbathing and having barbecues."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "only a handful of traditional flowers still grow in english country gardens."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "one in ten households has a hot tub in the garden."
+   }
+  }
+ },
+ "99aa7fdbe4c0aac8cc02997b5a028b7773423807": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "anti-semitic attacks surged worldwide by 38 per cent."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "report: 766 violent anti-semitic acts were carried out around the world last year."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "arson, vandalism and direct threats against jews, synagogues and other jewish institutions."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "anger in western europe over israel's military offensive in the gaza strip."
+   }
+  }
+ },
+ "9bfbb6ede20df9611c2a8b42980629658dc5ec23": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "paramedics were stretched to the limit and in cambridge a territorial army field."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "london ambulance service said they were dealing with over 600 calls per hour."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "ambulance crews answered 2,333 calls by 4am this morning."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "city centres descended into violence as fights broke out and revellers collapsed on the pavements."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "a man is slumped in a doorway as two women walk by as they celebrate the new year."
+   }
+  }
+ },
+ "a3fbaffd485b4dc8d4a3ca9f6bba1338876f2df2": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "green party leader natalie bennett has been forced to distance herself."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "natalie bennett has distanced herself from the bizarre blog posts of her boyfriend jim jepps."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "he used a blog called the daily maybe to defend 'rape fantasies'"
+   },
+   "3": {
+    "label": "Correct",
+    "text": "ms bennett's profile has soared in recent months."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "couple met five years ago when she contacted him to correct something he had written about her."
+   }
+  }
+ },
+ "a4dfb18d881e6792f32e45af6d44722e4ddc00e9": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "george lucas has unveiled plans to build an affordable housing complex."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "lucas dropped plans for a lucasfilm ltd studio on lucas valley road in 2012."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the star wars director would provide homes to 224 low-income families."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "george lucas is retaliating in a way that only the cream of hollywood could."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "neighbors say they did not want to be seen as an 'evil empire'"
+   }
+  }
+ },
+ "a666a65e91e9da1876f430ef9f2c9c3675064f2e": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "hudea was pictured late last year by photographer osman sagirli."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "her mother and three siblings are understood to have been living in the syrian camp."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the family took a fateful decision to move south, towards the city of idlib."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "it means family are in danger of becoming victims of a battle between the regime and rebels."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "image shows hudea frozen in fear with her arms raised and her lips tightly pursed."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "the little girl who broke millions of hearts after surrendering to a camera she mistook for a gun."
+   }
+  }
+ },
+ "ac4c516da1ddbf17dd3e57039bbe83d5cf3a09c8": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "youngster stands on the bank of what appears to be a lake and holds a tiny blue and yellow fishing rod."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "he crouches down by the side of the water and moves his rod from side to side."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the young boy reels rapidly, but at this point it isn't clear whether he has hooked anything."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the youngster holds a big grin on his face."
+   }
+  }
+ },
+ "b2b4299b66c206dd54897ea14bb18a803c00550e": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "dunkin roll chicken sandwich contains 68 per cent of your daily allowance of salt."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the new menu contains five new food options."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "obesity and obesity-related illness has become epidemic."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the menu also features two new flavors of the chain's cheesecake square donuts."
+   }
+  }
+ },
+ "b40397497a58ac9ce935ffa7df6c331c7520a1af": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "gwyneth paltrow will be living off $ 29 worth of food."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the mother-of-two posted a picture of her $ 29 grocery shop on her twitter account."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "paltrow has vowed to live on just $ 29 worth of food for a week."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "` this is what families on snap (i.e. food stamps have to live on for a week,' she wrote."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "a good blazer is an essential item that every girl should have in her wardrobe."
+   }
+  }
+ },
+ "b69f1601d82d5748518259a14cf164140bce7014": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the former new england patriots star had no conceivable reason to kill a man."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the way defense lawyer james sultan laid it out for the massachusetts jury."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the jury in the high-profile trial resumed wednesday."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "sultan tried to implicate hernandez's co-defendants, ernest wallace and carlos ortiz."
+   }
+  }
+ },
+ "b8ecb6b37168e64e1c64147728f6f8f2411cbcdd": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "george osborne drinks a pint of somerset cider as he is interviewed."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "his demeanour and pallid complexion reflected the sickly economy."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "nadir came when the chancellor was booed at paralympic games."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "it happened in front of his children, luke and liberty, aged 13 and 11."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "osborne reflects as we chat at the cotley inn in chard."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "watching george osborne enjoy scampi and chips with a glass of cider."
+   }
+  }
+ },
+ "b940c28afd154e43096c15b143641f16a5948292": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "bentleys and porsches are more likely to break down than cheaper cars."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the list price of bentleys ranges from # 136,250 to # 224,700."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "two marques finished bottom of a 38-strong table of vehicle manufacturers judged on reliability."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "thousands of cars aged three to eight were assessed on their failure rate, age, mileage and cost of repairs."
+   }
+  }
+ },
+ "ba6bd27c2351ee55746bcc913a83bfc77df77778": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "in a survey of 1,000 people from across the country, conducted by personal budgeting software company youneedabudget.com."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "` succumbing to peer pressure and buying things we wouldn't ordinary buy'"
+   },
+   "2": {
+    "label": "Correct",
+    "text": "64 per cent of adults think they spend more money when they go shopping with friends."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "nearly two-thirds of americans admit they would prefer to shop by themselves than with pals."
+   }
+  }
+ },
+ "bae8201fa542f26641a61429764b4aa9a1209c07": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "sir richard branson converted the old chapel in shipton-on-cherwell, oxfordshire."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "he had a recording studio in an old manor house a few miles away."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "sir richard branson brought the chapel into residential use while he was setting up virgin recording business."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the virgin logo has been printed in the red of those humble chapel doors."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "at the manor, the first virgin albums were recorded and branson."
+   }
+  }
+ },
+ "bd8b66af7d4dcffd26fb44366fe66ff000da9cd0": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "four in ten britons have average # 77 of this stuff lying around."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "four in ten brits have an average # 77 of unwanted good."
+   },
+   "2": {
+    "label": "Incorrect",
+    "text": "43 per cent said they could not think the value warranted the effort."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "research commissioned by store doddle found more than a third of adults have purchased items that they don't want."
+   }
+  }
+ },
+ "bf00005e50d0be4d1ce6b228a111778d72f39c95": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "she was 17 years old when she disappeared without a trace."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "in january 1981, police in bossier parish, louisiana, found a teenage girl stabbed nine times in the back and chest stashed under a pile of leaves in"
+   },
+   "2": {
+    "label": "Correct",
+    "text": "carol cole escaped from a texas juvenile jail in october 1980."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "detectives from bossier parish never stopped trying to identity the body they found mutilated."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "the image used by carol cole's family on craigslist posts across texas and louisiana."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "a facebook post and a craigslist ad worked together to solve the 34-year-old murder of a teenage girl from michigan."
+   }
+  }
+ },
+ "c16e78b7a9b1bf68030d4e9c6dc837501578e755": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "twitter user arke usa filmed the ice balls peppering his backyard and noisily plopping into the swimming pool."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "footage shows the hailstones coming down with many cracking as they hit the ground."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "in a matter of seconds the patio is completely covered in snow-white pellets."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "photographs taken after the hail storm passed show large punctures."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "giant hailstones crashed down over the south on tuesday with residents rushing out to capture the freak weather."
+   }
+  }
+ },
+ "c611ef2ba9e73788f5fd52c3d45068d2f17245b6": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "builders in turkey have accidentally found one of most complex underground cities."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the subterranean city dates back around 5,000 years and was discovered when builders saw signs of a massive network of tunnels."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the latest find is thought to be the biggest underground city."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "the area is famous for its stunning rock formations, deep valleys and ancient hideouts."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "the multilevel settlement is likely to include living spaces, kitchens, wineries, staircases."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "builders in turkey have accidentally found one of the largest and most complex cities in the otherworldly region of cappadocia."
+   }
+  }
+ },
+ "cb74eabb547bd0c340e5d38a97c7f2c9c62342f7": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "dame helen mirren was in her prime age-wise in the 1970s."
+   },
+   "1": {
+    "label": "Incorrect",
+    "text": "actress believes she was a 'horrible' time for women."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "actress looked stunning at the premiere of the woman in gold and showed us just why she's an inspiration to us."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "badgley mischka dress."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "the 69-year-old actress explained:' i happened to hit the culture at a time that was worse than the f ****** 1940s'"
+   }
+  }
+ },
+ "cddb33039dcceb2884e28160015a8e3af361f999": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "maria kukucova, 25, was arrested in april last year."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "she was eventually tracked down to her family's home 2,000 miles away."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the slovakian model had gone on the run after bush was found shot to death in southern spain."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "maria kukucova, 25, was arrested last year after former partner andy bush was found murdered."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "parents lubomir kukuca, 50, and danka kukucova, 51, said they feel hated in their own village."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "mr bush, 48, from bristol was found dead in a pool of blood."
+   },
+   "6": {
+    "label": "Correct",
+    "text": "parents are being forced to sell their house to pay her legal bills."
+   }
+  }
+ },
+ "ce066d9c86b56b0bab4415046232628b8a6aa6c3": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "ipswich were denied three points as rivals wolves fought back."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "wolves bouncing back through benik afobe's 31st goal of the season."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "ipswich boss mick mccarthy hailed the 'horrible bunch' of players."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "mccarthy was sacked by wolves in february 2012 after almost six years in charge."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "` wolves were in the ascendancy in the second half but we have had a great, stubborn, belligerent, professional performance'"
+   }
+  }
+ },
+ "ce8f9d8002502d23b637e4ac92e0077f7133f697": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "sgt. george hildebidle, who was on the force since 2003, was married with two children."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "officer's wife made the call, which was listed as a domestic dispute."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "hildebidle's house was evacuated as negotiations started."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "a police officer committed suicide thursday morning during a standoff at his home."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "charleston police chief gregg mullen speaks with local media following death of one of his officers."
+   }
+  }
+ },
+ "d41595ba90e677a566c675d85bd96df8defbc017": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "shayna hubers has been charged with murder in october 2012."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "hubers was 21 at the time, claimed she was acting in self-defense."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "hubers hubers, 24, is on trial in the 2012 shooting death of her lawyer boyfriend ryan poston."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "hubers shot poston six times inside his highland heights, ohio, condominium."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "testimony got under way tuesday."
+   }
+  }
+ },
+ "d43c4d8d7e002be73ec75cef8a937c56f2e298ff": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "britt mchenry is back to work."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the network has reinstated the 28-year-old to her role with a spot."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "her car was towed from the parking lot of a chinese restaurant in virginia."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "petitions for mchenry to be fired reached 10,000 within a day of the footage being released."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "britt mchenry was suspended for one week after the april 6 video."
+   }
+  }
+ },
+ "dae2675302d92bdf0bbd6d35c3e473389f8bb5a1": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "two cnn heroes are among the earthquake survivors."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "anuradha koirala has a rehabilitation center in kathmandu to 425 young women and girls."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "public has been warned not to use main water line due to cholera."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "she has offered to take in 200 other girls orphaned by the disaster."
+   }
+  }
+ },
+ "eb9829e1416eb8831eb1484c70e218d0d84f4e81": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "richard kerr said he was one of three youngsters who were taken from home in belfast."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "they were allegedly molested by politicians and other establishment figures."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "his account provides the first clear link between three alleged major vip paedophile rings."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "mr kerr told how he suffered abuse at kincora children's home."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "richard kerr, 53, was abused by 'powerful people' in westminster paedophile ring."
+   }
+  }
+ },
+ "ec8df2c3e9008c92e77aa92e5452043a33d7adff": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "hearn has insisted his # 1.5 million purse offer to carl frampton comes with no strings attached."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "hearn unveiled a cheque with sky tv cameras in a bid to force a deal with the ibf super-bantamweight champion."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "frampton's promoters, cyclone promotions, headed by former world champ barry mcguigan."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "hearn said the cheque offered 1.5 m reasons for the two boxers to fight."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "eddie hearn presents the cheque to set-up scott quigg's fight with carl frampton."
+   }
+  }
+ },
+ "ef52c03e46ff2a2cc4db02978ad1d9762370ace7": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the crashes took place between october 2010 and january 2012."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "all the collisions followed similar scenarios in which a car would collide with the side of a bus."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "passengers were mainly friends and relatives complicit in the scam."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "it then collides into the bus as part of # 1million 'crash for cash'"
+   },
+   "4": {
+    "label": "Correct",
+    "text": "in each case, the driver of the car would admit full liability."
+   },
+   "5": {
+    "label": "Correct",
+    "text": "the blue audi pulls out from whitchurch road, in chester and accelerates."
+   },
+   "6": {
+    "label": "Correct",
+    "text": "audi pulled out of a road and deliberately crashed into side of bus."
+   }
+  }
+ },
+ "f60570b57867a61c087114a4cc9a3859175ed2eb": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "experts say training was 'heavily geared' towards young people."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "association of accounting technicians said research showed over-55s had the same literacy and numeracy skills as those aged 16 to 24."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "aat said the death of a 'job for life' meant workers could no longer rely on loyalty to their company."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "while older generations often pride themselves on their numeracy and literacy skills."
+   }
+  }
+ },
+ "f67a847a5bc4ca43e757056b85eb98e947891fa2": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the spectacular isolated fort, one of three guarding the entrance to the solent, just off the coast of the isle of wight, has been turned into a"
+   },
+   "1": {
+    "label": "Correct",
+    "text": "the unique hotel looks like a fortress of a james bond villain."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the fort has been transformed by amazing venues to become a luxury hotel."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "no man's offers its own spa, a choice of bars and a sun deck for ocean views."
+   },
+   "4": {
+    "label": "Incorrect",
+    "text": "the boat is set to open this month."
+   }
+  }
+ },
+ "f78024d271fd21f0667f5da6843516314af71f8f": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "the family-run restaurant finds itself at the center of the debate over the state's religious freedom act."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "supporters had donated more than $ 842,000 for the business."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "the new law would allow businesses to discriminate against gays and lesbians."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "pizza in the indiana town of walkerton is finding out."
+   }
+  }
+ },
+ "fa39685d391188f3fd5afc3d4691327e755619c7": {
+  "label": "Incorrect",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "temperatures in the south could reach 23c (73f) by wednesday."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "incoming high tides and strong winds have prompted five flood alerts to be in place today."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "people have made the most of the sunny weather this weekend by heading to beaches and parks."
+   },
+   "3": {
+    "label": "Incorrect",
+    "text": "best temperatures at 2pm today were 16.2 c (61.2 f) at achnagart in plymouth, devon."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "ladbrokes has cut its odds on record to 4/6."
+   }
+  }
+ },
+ "ff09200a1ba20c552dc13231878d5e452e318c46": {
+  "label": "Correct",
+  "sents": {
+   "0": {
+    "label": "Correct",
+    "text": "neville believes manchester united face their toughest test of the season."
+   },
+   "1": {
+    "label": "Correct",
+    "text": "louis van gaal's side have beaten tottenham, liverpool and manchester city."
+   },
+   "2": {
+    "label": "Correct",
+    "text": "neville knows united have played well in recent weeks."
+   },
+   "3": {
+    "label": "Correct",
+    "text": "gary neville believes united have a good chance of beating chelsea."
+   },
+   "4": {
+    "label": "Correct",
+    "text": "united face a stern examination at stamford bridge."
+   }
+  }
+ }
+}

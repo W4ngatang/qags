@@ -296,17 +296,23 @@ def aggregate_questions_from_txt():
     and the questions as generated 'hypotheses' (H) """
 
     # Parameters
-    data = 'xsum'
-    n_exs = 1000
-    data_dir = f"{DATA_DIR}/cnndailymail/fseq" if data == "cnndm" else f"{DATA_DIR}/xsum"
-    dataset = f'{data}-random{n_exs}'
-    gen_mdl = "bart"
+    data = 'falke-sent-rerank'
+    subset = "incorrect2src"
+    if data == "cnndm":
+        data_dir = f"{DATA_DIR}/cnndailymail/fseq"
+    elif data == "xsum":
+        data_dir = f"{DATA_DIR}/xsum"
+    elif data == "falke-sent-rerank":
+        data_dir = f"{DATA_DIR}/falke-correctness/sent-rerank"
+    dataset = f'{data}-{subset}'
+    gen_mdl = "incorrect"
     qg_model = "qg-newsqa-ans"
+    n_exs = 373
     n_qsts = 10 # n questions we actually want to use
     n_gen_qsts = 10 # n questions generated per doc
-    n_ans = 10 # n answer candidates
-    use_all_qsts = False # use all qsts, mostly if we want answers to our questions
-    use_act_anss = True # use actual answer (filter if actual answer is empty)
+    n_ans = 5 # n answer candidates
+    use_all_qsts = True # use all qsts, mostly if we want answers to our questions
+    use_act_anss = False # use actual answer (filter if actual answer is empty)
     use_exp_anss = False # use expected answer (filter if actual answer doesn't match)
     beam = 10
     topk = 0
@@ -320,14 +326,21 @@ def aggregate_questions_from_txt():
     # Original texts
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
-        src_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src.random1000.txt"
-        src_w_trg_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_w_trg.random1000.txt" if data == "xsum" else None
-        gen_txt_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{gen_mdl}.random1000.txt"
-        src_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.src_{n_ans}ans.random1000.txt"
-        gen_ans_file = f"{data_dir}/random{n_exs}-{n_ans}ans/{data}.test.{gen_mdl}_{n_ans}ans.random1000.txt"
+        #src_txt_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.src.random1000.txt"
+        #src_w_trg_txt_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.src_w_trg.{subset}.txt" if data == "xsum" else None
+        #gen_txt_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.{gen_mdl}.{subset}.txt"
+        #src_ans_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.src_{n_ans}ans.{subset}.txt"
+        #gen_ans_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.{gen_mdl}_{n_ans}ans.{subset}.txt"
+        src_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src.txt"
+        src_w_trg_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_w_trg.{subset}.txt" if data == "xsum" else None
+        gen_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}.txt"
+        src_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_ans.txt"
+        gen_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}_ans.txt"
+
     else:
-        src_txt_file = f"{data_dir}/random{n_exs}/src2bart/raw/test.src"
-        gen_txt_file = f"{data_dir}/random{n_exs}/bart2src/raw/test.src"
+        # NOTE(Alex): these aren't abstracted / generalized
+        src_txt_file = f"{data_dir}/{subset}/src2bart/raw/test.src"
+        gen_txt_file = f"{data_dir}/{subset}/bart2src/raw/test.src"
 
     # Files containing all generated questions
     if topk > 0:
@@ -348,14 +361,15 @@ def aggregate_questions_from_txt():
 
     # Predicted answers from QA model
     src_prd_file = f""
-    gen_prd_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-beam10.{dataset}-gen.json"
+    #gen_prd_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-beam10.{dataset}-gen.json"
+    gen_prd_file = f""
 
     files = {
              "src": {"txt": src_txt_file, "qst": src_qst_file, "prb": src_prob_file, "prd": src_prd_file},
              "gen": {"txt": gen_txt_file, "qst": gen_qst_file, "prb": gen_prob_file, "prd": gen_prd_file},
             }
 
-    out_dir = f"{PROJ_DIR}/data/{data}/random{n_exs}"
+    out_dir = f"{PROJ_DIR}/data/{data}/{subset}"
     if n_ans > 0:
         out_dir = f"{out_dir}-{n_ans}ans"
         n_gen_qsts *= n_ans
@@ -409,7 +423,6 @@ def aggregate_questions_from_txt():
                 ret = filter_qsts(cand_qsts, n_qsts,
                                   prbs=cand_prbs, reverse_prob=reverse_prob,
                                   exp_anss=cand_anss, act_anss=cand_prds)
-                clean_qsts = ret['qsts']
             else:
                 ret = {
                        'qsts': cand_qsts,
@@ -417,6 +430,7 @@ def aggregate_questions_from_txt():
                        'n_qsts_w_ans': None,
                        'n_qsts_w_match_ans': None,
                       }
+            clean_qsts = ret['qsts']
             for qst in clean_qsts:
                 assert not isinstance(qst, list), "List instead of string detected!"
             all_clean_qsts.append(clean_qsts)
@@ -655,6 +669,33 @@ def align_summaries():
     return
 
 
+def prepare_falke_sent_reranking_data():
+    """ """
+
+    data_file = f"{DATA_DIR}/falke-correctness/val_sentence_pairs.json"
+    out_dir = f"{DATA_DIR}/falke-correctness/sent_reranking"
+
+    data = json.load(open(data_file, encoding="utf-8"))
+    ctxs, corrects, incorrects = list(), list(), list()
+
+    for datum in data:
+        ctxs.append(datum["article_sent"])
+        corrects.append(datum["correct_sent"])
+        incorrects.append(datum["incorrect_sent"])
+
+    def write_file(out_file, data):
+        with open(out_file, 'w', encoding='utf-8') as out_fh:
+            for datum in data:
+                out_fh.write(f"{datum}\n")
+
+    write_file(f"{out_dir}/test.src.txt", ctxs)
+    write_file(f"{out_dir}/test.correct.txt", corrects)
+    write_file(f"{out_dir}/test.incorrect.txt", incorrects)
+    print(f"Extracted {len(ctxs)} sentences from {data_file}")
+    print(f"\tWrote to {out_dir}")
+
+
+
 def prepare_multiqa_data():
     """ Take QA data in a MultiQA format and output in fairseq format """
 
@@ -721,22 +762,31 @@ def prepare_ans_conditional_data():
     Will generate CONST instances for each line in txt
     """
 
-    n_ans_per_txt = 50
+    n_ans_per_txt = 5
     txt_fld = "src"
 
-    data_file = f"{DATA_DIR}/xsum/random1000/xsum.test.{txt_fld}.10251125.random1000.txt"
-    out_dir = f"{DATA_DIR}/xsum/random1000-{n_ans_per_txt}ans"
-    txt_w_ans_file = f"{out_dir}/xsum.test.{txt_fld}_w_{n_ans_per_txt}ans.10251125.random1000.txt"
-    txt_file = f"{out_dir}/xsum.test.{txt_fld}.10251125.random1000.txt"
-    ans_file = f"{out_dir}/xsum.test.{txt_fld}_{n_ans_per_txt}ans.10251125.random1000.txt"
+    # Falke
+    data_file = f"{DATA_DIR}/falke-correctness/sent_reranking/test.incorrect.txt"
+    out_dir = f"{DATA_DIR}/falke-correctness/sent_reranking/{n_ans_per_txt}ans"
+    txt_w_ans_file = f"{out_dir}/test.incorrect_w_ans.txt"
+    txt_file = f"{out_dir}/test.incorrect.txt"
+    ans_file = f"{out_dir}/test.incorrect_ans.txt"
 
+    # XSUM
+    #data_file = f"{DATA_DIR}/xsum/random1000/xsum.test.{txt_fld}.10251125.random1000.txt"
+    #out_dir = f"{DATA_DIR}/xsum/random1000-{n_ans_per_txt}ans"
+    #txt_w_ans_file = f"{out_dir}/xsum.test.{txt_fld}_w_{n_ans_per_txt}ans.10251125.random1000.txt"
+    #txt_file = f"{out_dir}/xsum.test.{txt_fld}.10251125.random1000.txt"
+    #ans_file = f"{out_dir}/xsum.test.{txt_fld}_{n_ans_per_txt}ans.10251125.random1000.txt"
+
+    # CNN/DM
     #data_file = f"{DATA_DIR}/cnndailymail/fseq/subset1000/subset1000.{txt_fld}.random.ref_order.txt"
     #out_dir = f"{DATA_DIR}/cnndailymail/fseq/random1000-{n_ans_per_txt}ans"
     #txt_w_ans_file = f"{out_dir}/cnndm.test.{txt_fld}_w_{n_ans_per_txt}ans.random1000.txt"
     #txt_file = f"{out_dir}/cnndm.test.{txt_fld}.random1000.txt"
     #ans_file = f"{out_dir}/cnndm.test.{txt_fld}_{n_ans_per_txt}ans.random1000.txt"
 
-    use_only_no_ans = True
+    use_only_no_ans = False
     use_no_ans = False
     print(f"Preparing answer conditional question generation data for {data_file}")
     if use_only_no_ans:
@@ -1491,29 +1541,29 @@ else:
 #prepare_multiqa_data()
 #prepare_ans_conditional_data()
 #prepare_parlai_data()
-
+#prepare_falke_sent_reranking_data()
 
 ###### Extract data from generating and prepare QA data #####
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
 #aggregate_questions_from_fseq_log()
-#aggregate_questions_from_txt()
+aggregate_questions_from_txt()
 
 
 ##### MTurk analysis #####
-compute_correlations_with_human(turk_files=exp_d[gen_mdl],
-                                ref_file=exp_d["ref"],
-                                hyp_file=exp_d["hyp"][gen_mdl],
-                                mdl=gen_mdl,
-                                qags_src_file=qags_src_file,
-                                qags_trg_file=qags_trg_file,
-                                n_qsts_per_doc=n_qsts_per_doc
-                                )
+#compute_correlations_with_human(turk_files=exp_d[gen_mdl],
+#                                ref_file=exp_d["ref"],
+#                                hyp_file=exp_d["hyp"][gen_mdl],
+#                                mdl=gen_mdl,
+#                                qags_src_file=qags_src_file,
+#                                qags_trg_file=qags_trg_file,
+#                                n_qsts_per_doc=n_qsts_per_doc
+#                                )
 
-if src_inp_file and trg_inp_file:
-    inspect_qas(src_inp_file=src_inp_file,
-                gen_inp_file=trg_inp_file,
-                src_out_file=qags_src_file,
-                gen_out_file=qags_trg_file)
+#if src_inp_file and trg_inp_file:
+#    inspect_qas(src_inp_file=src_inp_file,
+#                gen_inp_file=trg_inp_file,
+#                src_out_file=qags_src_file,
+#                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
