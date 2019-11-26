@@ -140,7 +140,7 @@ def filter_qsts(qsts, n_qsts,
 
     n_clean_qsts = len(clean_qsts)
     if n_clean_qsts < n_qsts:
-        print("Too few questions!")
+        #print("Too few questions!")
         supp_qsts = random.sample(qsts, n_qsts - n_clean_qsts)
         clean_qsts += supp_qsts
 
@@ -308,11 +308,11 @@ def aggregate_questions_from_txt():
     gen_mdl = "incorrect"
     qg_model = "qg-newsqa-ans"
     n_exs = 373
-    n_qsts = 10 # n questions we actually want to use
+    n_qsts = 25 # n questions we actually want to use
     n_gen_qsts = 10 # n questions generated per doc
     n_ans = 5 # n answer candidates
-    use_all_qsts = True # use all qsts, mostly if we want answers to our questions
-    use_act_anss = False # use actual answer (filter if actual answer is empty)
+    use_all_qsts = False # use all qsts, mostly if we want answers to our questions
+    use_act_anss = True # use actual answer (filter if actual answer is empty)
     use_exp_anss = False # use expected answer (filter if actual answer doesn't match)
     beam = 10
     topk = 0
@@ -335,7 +335,7 @@ def aggregate_questions_from_txt():
         src_w_trg_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_w_trg.{subset}.txt" if data == "xsum" else None
         gen_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}.txt"
         src_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_ans.txt"
-        gen_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}_ans.txt"
+        gen_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}_w_ans.txt"
 
     else:
         # NOTE(Alex): these aren't abstracted / generalized
@@ -361,8 +361,7 @@ def aggregate_questions_from_txt():
 
     # Predicted answers from QA model
     src_prd_file = f""
-    #gen_prd_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-beam10.{dataset}-gen.json"
-    gen_prd_file = f""
+    gen_prd_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-beam10.{dataset}-gen.json"
 
     files = {
              "src": {"txt": src_txt_file, "qst": src_qst_file, "prb": src_prob_file, "prd": src_prd_file},
@@ -404,7 +403,7 @@ def aggregate_questions_from_txt():
 
     # for each (question from a source x txt source) pair,
     # build the data then write out a SQuAD format file
-    bookkeep = {k: {'idxs': list(), 'min': n_gen_qsts} for k in \
+    bookkeep = {k: {'idxs': list(), 'min': n_gen_qsts, 'n_below': 0, 'counts': list()} for k in \
                  ['n_clean_qsts', 'n_qsts_w_ans', 'n_qsts_w_match_ans']}
     for qst_src in all_qsts:
         if qst_src != "gen":
@@ -444,6 +443,9 @@ def aggregate_questions_from_txt():
                     bookkeep[k]['idxs'] = [i]
                 elif v == bookkeep[k]['min']:
                     bookkeep[k]['idxs'].append(i)
+                if v < n_qsts:
+                    bookkeep[k]['n_below'] += 1
+                bookkeep[k]['counts'].append(v)
 
         # Construct data in SQuAD-like format
         for txt_fld in all_txts:
@@ -481,8 +483,16 @@ def aggregate_questions_from_txt():
             json.dump(data, open(out_file, "w", encoding="utf-8"))
 
     for k, v in bookkeep.items():
-        print(f"{len(v['idxs'])} exs with min {v['min']} {k}")
-        print(f"\tidxs: {list(set(v['idxs']))}")
+        if not v['counts']:
+            continue
+        counts = np.array(v['counts'])
+        print(f"{k}: ")
+        print(f"\t{len(v['idxs'])} exs with min {v['min']} (idxs: {list(set(v['idxs']))})")
+        print(f"\t{v['n_below']} exs w/ fewer than {n_qsts} clean questions!")
+        print(f"\tmean: {np.mean(counts)}")
+        print(f"\tmedian: {np.median(counts)}")
+        print(f"\tmax: {np.max(counts)}")
+        print(f"\tmin: {np.min(counts)}")
 
 
 def aggregate_questions_from_fseq_log():
@@ -669,33 +679,6 @@ def align_summaries():
     return
 
 
-def prepare_falke_sent_reranking_data():
-    """ """
-
-    data_file = f"{DATA_DIR}/falke-correctness/val_sentence_pairs.json"
-    out_dir = f"{DATA_DIR}/falke-correctness/sent_reranking"
-
-    data = json.load(open(data_file, encoding="utf-8"))
-    ctxs, corrects, incorrects = list(), list(), list()
-
-    for datum in data:
-        ctxs.append(datum["article_sent"])
-        corrects.append(datum["correct_sent"])
-        incorrects.append(datum["incorrect_sent"])
-
-    def write_file(out_file, data):
-        with open(out_file, 'w', encoding='utf-8') as out_fh:
-            for datum in data:
-                out_fh.write(f"{datum}\n")
-
-    write_file(f"{out_dir}/test.src.txt", ctxs)
-    write_file(f"{out_dir}/test.correct.txt", corrects)
-    write_file(f"{out_dir}/test.incorrect.txt", incorrects)
-    print(f"Extracted {len(ctxs)} sentences from {data_file}")
-    print(f"\tWrote to {out_dir}")
-
-
-
 def prepare_multiqa_data():
     """ Take QA data in a MultiQA format and output in fairseq format """
 
@@ -753,7 +736,6 @@ def prepare_multiqa_data():
                 out_fh.write(f'{trg}\n')
 
         print(f"Finished extracting {split} split for {task}")
-
 
 
 def prepare_ans_conditional_data():
@@ -1036,6 +1018,71 @@ def prepare_parlai_data():
                 for sents_d in data_slice:
                     for sent_d in sents_d:
                         sent_fh.write(f"{json.dumps(sent_d)}\n")
+
+
+def prepare_falke_sent_reranking_data():
+    """ """
+
+    data_file = f"{DATA_DIR}/falke-correctness/val_sentence_pairs.json"
+    out_dir = f"{DATA_DIR}/falke-correctness/sent_reranking"
+
+    data = json.load(open(data_file, encoding="utf-8"))
+    ctxs, corrects, incorrects = list(), list(), list()
+
+    for datum in data:
+        ctxs.append(datum["article_sent"])
+        corrects.append(datum["correct_sent"])
+        incorrects.append(datum["incorrect_sent"])
+
+    def write_file(out_file, data):
+        with open(out_file, 'w', encoding='utf-8') as out_fh:
+            for datum in data:
+                out_fh.write(f"{datum}\n")
+
+    write_file(f"{out_dir}/test.src.txt", ctxs)
+    write_file(f"{out_dir}/test.correct.txt", corrects)
+    write_file(f"{out_dir}/test.incorrect.txt", incorrects)
+    print(f"Extracted {len(ctxs)} sentences from {data_file}")
+    print(f"\tWrote to {out_dir}")
+
+
+def falke_sent_ranking():
+    """ """
+    n_qsts = 25
+    use_act_ans = True
+    use_exp_ans = False
+    assert not (use_act_ans and use_exp_ans), "Invalid settings!"
+
+    if use_act_ans:
+        qst_prefix = "qst_w_ans"
+    elif use_exp_ans:
+        qst_prefix = "qst_w_match"
+    else:
+        qst_prefix = "qst"
+
+    correct_gen_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-correct2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-correct2src-5ans-gen.json"
+    correct_src_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-correct2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-correct2src-5ans-src.json"
+    incorrect_gen_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-incorrect2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-incorrect2src-5ans-gen.json"
+    incorrect_src_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-incorrect2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-incorrect2src-5ans-src.json"
+
+    print("***** Falke sentence ranking experiments *****")
+    for metric_name in ["em", "f1"]:
+        correct_qags_scores = get_qags_scores(correct_gen_file, correct_src_file,
+                                              metric_name=metric_name,
+                                              n_qsts_per_doc=n_qsts)
+        incorrect_qags_scores = get_qags_scores(incorrect_gen_file, incorrect_src_file,
+                                                metric_name=metric_name,
+                                                n_qsts_per_doc=n_qsts)
+        assert len(correct_qags_scores) == len(incorrect_qags_scores)
+        n_exs = len(correct_qags_scores)
+
+        n_correct_gt = 0
+        n_correct_ge = 0
+        for cor_score, incor_score in zip(correct_qags_scores, incorrect_qags_scores):
+            n_correct_gt += int(cor_score > incor_score)
+            n_correct_ge += int(cor_score >= incor_score)
+        print(f"Using {metric_name}: {n_correct_gt} / {n_exs} ({(1 - n_correct_gt/n_exs) * 100:.2f}% incorrect (>))")
+        print(f"Using {metric_name}: {n_correct_ge} / {n_exs} ({(1 - n_correct_ge/n_exs) * 100:.2f}% incorrect (>=)) ")
 
 
 def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
@@ -1547,7 +1594,7 @@ else:
 #extract_src_trg_gen_from_fseq_log()
 #extract_questions_and_write_jsonl()
 #aggregate_questions_from_fseq_log()
-aggregate_questions_from_txt()
+#aggregate_questions_from_txt()
 
 
 ##### MTurk analysis #####
@@ -1567,3 +1614,6 @@ aggregate_questions_from_txt()
 #                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
+
+##### Extra experiments #####
+falke_sent_ranking()

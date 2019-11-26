@@ -156,21 +156,35 @@ function predict_extractive() {
     squad_version="v2_0"
     ckpt_dir="${ckpt_dir}/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}"
     qg_ckpt="best"
-    n_ans=10
-    n_qsts=10
-    dataset="xsum"
-    subset="random1000-${n_ans}ans"
+    n_ans=5
+    n_qsts=25
+    dataset="falke-sent-rerank"
+    subset="incorrect2src-${n_ans}ans"
     tmp="${dataset}-${subset}"
     qg_model="qg-newsqa-ans"
     use_all=0
+    use_exp_ans=0
+    use_act_ans=1
     beam=10
     topk=0
     topp=0
-    gpu_id=1
+    gpu_id=0
+    batch_size=16
 
-    for txt_fld in src_w_trg gen src; do
-    #for txt_fld in gen; do
-        #for qst_src in gen src; do
+    if [ ${use_all} -eq 1 ]; then
+        qst_prefix="qstall"
+    else
+        if [ ${use_exp_ans} -eq 1 ]; then
+            qst_prefix="qst_w_match"
+        elif [ ${use_act_ans} -eq 1 ]; then
+            qst_prefix="qst_w_ans"
+        else
+            qst_prefix="qst"
+        fi
+        qst_prefix="${qst_prefix}${n_qsts}"
+    fi
+
+    for txt_fld in src gen; do
         for qst_src in gen; do
             out_dir="${ckpt_dir}/${tmp}/bart"
             mkdir -p ${out_dir}
@@ -178,21 +192,22 @@ function predict_extractive() {
             if [ ${use_all} -eq 1 ]; then
                 # TODO(Alex): beam actually can vary
                 pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qstall-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qstall-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
                 echo "Predicting for all questions!"
             elif [ ${topk} -gt 0 ]; then
                 pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
             elif [ ${beam} -gt 0 ]; then
                 pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst_w_ans${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst_w_ans${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
             else
                 pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
+                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
             fi
 
             python finetune_pt_squad.py \
               --local_rank ${gpu_id} \
+              --predict_batch_size ${batch_size} \
               --bert_model ${bert_version} \
               --do_predict \
               --do_lower_case \
