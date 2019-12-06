@@ -14,12 +14,9 @@ from functools import lru_cache
 from collections import defaultdict, Counter
 
 import ipdb
-import spacy
 import numpy as np
 import pandas as pd
-from scipy.stats import pearsonr, spearmanr
-
-import rouge
+import spacy
 from nltk.tokenize import sent_tokenize
 from nltk import agreement
 try:
@@ -34,7 +31,8 @@ try:
     import krippendorff
 except ModuleNotFoundError as e:
     print("Unable to import Krippendorff!")
-#from parlai.mturk.core.mturk_data_handler import MTurkDataHandler
+from scipy.stats import pearsonr, spearmanr
+import rouge
 
 from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
@@ -70,6 +68,18 @@ elif 'fair' in hostname:
     DATA_DIR = '/private/home/wangalexc/data'
 else:
     raise ValueError(f"Unknown hostname {hostname} detected! Paths are probably set wrong.")
+
+
+@lru_cache(maxsize=512)
+def get_spacy_nlp(model="en_trf_robertabase_lg"):
+    nlp = spacy.load(model)
+    return nlp
+
+
+@lru_cache(maxsize=512)
+def get_nlgeval():
+    nlgeval = NLGEval(no_skipthoughts=True, no_glove=True, metrics_to_omit=['ROUGE_L', 'CIDEr'])
+    return nlgeval
 
 
 def detokenize_sent(sent):
@@ -153,20 +163,19 @@ def filter_qsts(qsts, n_qsts,
     return ret
 
 
-@lru_cache(maxsize=512)
-def get_spacy_nlp(model="en_trf_robertabase_lg"):
-    nlp = spacy.load(model)
-    return nlp
-
-
-@lru_cache(maxsize=512)
-def get_nlgeval():
-    nlgeval = NLGEval(no_skipthoughts=True, no_glove=True, metrics_to_omit=['ROUGE_L', 'CIDEr'])
-    return nlgeval
-
-
 def extract_ans(txts):
     """ extract entities from a sentence using spacy
+
+    rules:
+        - entities (non-pronoun)
+            - each portion of a person's name
+        - noun chunks (non-pronoun)
+            - adjectives within noun chunks
+            - nouns w/ dependencies that are proper nouns, roughly nouns modifying proper nouns
+            - if the head of a noun chunk if a verb, the entire noun chunk ?
+        - for each conjunction,
+            - the subtree of the head
+            - the subtree of the children
     """
     nlp = get_spacy_nlp("en_core_web_lg")
     all_ans = list()
@@ -174,9 +183,38 @@ def extract_ans(txts):
         ans = list()
         for ent in doc.ents:
             ans.append(ent.text)
-        for noun in doc.noun_chunks:
-            ans.append(noun.text)
-        all_ans.append(list(set(ans)))
+            #if not (len(ent) == 1 and ent[0].pos_ in ['PRON']):
+            #    ans.append(ent.text)
+            #if ent.label_ in ['PERSON']:
+            #    for tok in ent:
+            #        ans.append(tok.text)
+        for chunk in doc.noun_chunks:
+            ans.append(chunk.text)
+            #if not (len(chunk) == 2 and chunk[0].pos_ in ['PRON']):
+            #    ans.append(chunk.text)
+            #for tok in chunk:
+            #    if tok.pos_ in ['ADJ']:
+            #        ans.append(tok.text)
+
+            #    if tok.pos_ in ['NOUN'] and tok.head.pos_ in ['PROPN']:
+            #        ans.append(tok.text)
+
+            #    if tok.head.pos_ in ['VERB']:
+            #        ans.append(' '.join([t.text for t in tok.head.subtree]))
+
+        #specials = [t for t in doc if t.pos_ in ['SCONJ'] or t.tag_ in ['IN']]
+        #for special in specials:
+        #    ans.append(' '.join([t.text for t in special.head.subtree]))
+        #    # subtrees of conjunctions
+        #    for child in special.children:
+        #        if child.is_punct or child.is_quote:
+        #            continue
+        #        ans.append(' '.join([t.text for t in child.subtree]))
+
+        ans = list(set(ans))
+        #ans = sorted(ans, key=lambda x: len(x))
+        #ipdb.set_trace()
+        all_ans.append(ans)
     return all_ans
 
 
@@ -296,8 +334,9 @@ def aggregate_questions_from_txt():
     and the questions as generated 'hypotheses' (H) """
 
     # Parameters
-    data = 'falke-sent-rerank'
-    subset = "incorrect2src"
+    data = 'cnndm'
+    subset = 'random1000'
+    gen_mdl = 'bus'
     if data == "cnndm":
         data_dir = f"{DATA_DIR}/cnndailymail/fseq"
     elif data == "xsum":
@@ -305,12 +344,12 @@ def aggregate_questions_from_txt():
     elif data == "falke-sent-rerank":
         data_dir = f"{DATA_DIR}/falke-correctness/sent-rerank"
     dataset = f'{data}-{subset}'
-    gen_mdl = "incorrect"
-    qg_model = "qg-newsqa-ans"
-    n_exs = 373
-    n_qsts = 25 # n questions we actually want to use
+    qg_model = 'qg-newsqa-ans'
+    bert_version = 'bert-large-uncased'
+    n_exs = 1000
+    n_qsts = 20 # n questions we actually want to use
     n_gen_qsts = 10 # n questions generated per doc
-    n_ans = 5 # n answer candidates
+    n_ans = 10 # n answer candidates
     use_all_qsts = False # use all qsts, mostly if we want answers to our questions
     use_act_anss = True # use actual answer (filter if actual answer is empty)
     use_exp_anss = False # use expected answer (filter if actual answer doesn't match)
@@ -321,18 +360,13 @@ def aggregate_questions_from_txt():
 
     # Some sanity checks
     if use_all_qsts:
-        assert n_qsts == n_gen_qsts, f"Only using {n_gen_qsts} of {n_qsts} questions!"
+        assert n_qsts == n_gen_qsts, f"Only using {n_qsts} of {n_gen_qsts} questions!"
 
     # Original texts
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
-        #src_txt_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.src.random1000.txt"
-        #src_w_trg_txt_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.src_w_trg.{subset}.txt" if data == "xsum" else None
-        #gen_txt_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.{gen_mdl}.{subset}.txt"
-        #src_ans_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.src_{n_ans}ans.{subset}.txt"
-        #gen_ans_file = f"{data_dir}/{subset}-{n_ans}ans/{data}.test.{gen_mdl}_{n_ans}ans.{subset}.txt"
         src_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src.txt"
-        src_w_trg_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_w_trg.{subset}.txt" if data == "xsum" else None
+        src_w_trg_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_w_trg.txt" if data == "xsum" else None
         gen_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}.txt"
         src_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_ans.txt"
         gen_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}_w_ans.txt"
@@ -343,25 +377,29 @@ def aggregate_questions_from_txt():
         gen_txt_file = f"{data_dir}/{subset}/bart2src/raw/test.src"
 
     # Files containing all generated questions
-    if topk > 0:
-        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
-        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.txt"
-        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
-        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topk{topk}.prob"
-    elif topp > 0:
-        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
-        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.txt"
-        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
-        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.topp{topp}.prob"
+    if use_all_qsts:
+        qst_prefix = "qstall"
+    elif use_exp_anss:
+        qst_prefix = f"qst_w_match{n_qsts}{bert_version}"
+    elif use_act_anss:
+        qst_prefix = f"qst_w_ans{n_qsts}{bert_version}"
     else:
-        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
-        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.txt"
-        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
-        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.beam{beam}.prob"
+        qst_prefix = f"qst{n_qsts}"
+
+    if topk > 0:
+        dec_opt = f'topk{topk}'
+    elif topp > 0:
+        dec_opt = f'topp{topp}'
+    else:
+        dec_opt = f'beam{beam}'
+    src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
+    gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
+    src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
+    gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
 
     # Predicted answers from QA model
     src_prd_file = f""
-    gen_prd_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-beam10.{dataset}-gen.json"
+    gen_prd_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-{dec_opt}.{dataset}-gen.json"
 
     files = {
              "src": {"txt": src_txt_file, "qst": src_qst_file, "prb": src_prob_file, "prd": src_prd_file},
@@ -464,21 +502,8 @@ def aggregate_questions_from_txt():
                 raw_data[i] = {txt_fld: txt, "hypotheses": clean_qsts}
 
             data = format_squad(raw_data, context=txt_fld, ctx_split=True)
-            if beam > 0:
-                gen_suffix = f"beam{beam}"
-            elif topk > 0:
-                gen_suffix = f"topk{topk}"
-            elif topp > 0:
-                gen_suffix = f"topp{topp}"
 
-            if use_all_qsts:
-                out_file = f"{out_dir}/qstall-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
-            elif use_exp_anss:
-                out_file = f"{out_dir}/qst_w_match{n_qsts}-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
-            elif use_act_anss:
-                out_file = f"{out_dir}/qst_w_ans{n_qsts}-{qst_src}-{qg_model}-beam{beam}.{dataset}-{txt_fld}.json"
-            else:
-                out_file = f"{out_dir}/qst{n_qsts}-{qst_src}-{qg_model}-{gen_suffix}.{dataset}-{txt_fld}.json"
+            out_file = f"{out_dir}/{qst_prefix}-{qst_src}-{qg_model}-{dec_opt}.{dataset}-{txt_fld}.json"
             print(f"Writing to {out_file}")
             json.dump(data, open(out_file, "w", encoding="utf-8"))
 
@@ -744,22 +769,23 @@ def prepare_ans_conditional_data():
     Will generate CONST instances for each line in txt
     """
 
-    n_ans_per_txt = 5
-    txt_fld = "src"
+    n_ans_per_txt = 10
+    txt_fld = "bart"
 
     # Falke
-    data_file = f"{DATA_DIR}/falke-correctness/sent_reranking/test.incorrect.txt"
-    out_dir = f"{DATA_DIR}/falke-correctness/sent_reranking/{n_ans_per_txt}ans"
-    txt_w_ans_file = f"{out_dir}/test.incorrect_w_ans.txt"
-    txt_file = f"{out_dir}/test.incorrect.txt"
-    ans_file = f"{out_dir}/test.incorrect_ans.txt"
+    split = "correct"
+    data_file = f"{DATA_DIR}/falke-correctness/sent_reranking/test.{split}.txt"
+    out_dir = f"{DATA_DIR}/falke-correctness/sent_reranking/{split}2src-{n_ans_per_txt}ans"
+    txt_w_ans_file = f"{out_dir}/test.{split}_w_ans.txt"
+    txt_file = f"{out_dir}/test.{split}.txt"
+    ans_file = f"{out_dir}/test.{split}_ans.txt"
 
     # XSUM
     #data_file = f"{DATA_DIR}/xsum/random1000/xsum.test.{txt_fld}.10251125.random1000.txt"
     #out_dir = f"{DATA_DIR}/xsum/random1000-{n_ans_per_txt}ans"
-    #txt_w_ans_file = f"{out_dir}/xsum.test.{txt_fld}_w_{n_ans_per_txt}ans.10251125.random1000.txt"
-    #txt_file = f"{out_dir}/xsum.test.{txt_fld}.10251125.random1000.txt"
-    #ans_file = f"{out_dir}/xsum.test.{txt_fld}_{n_ans_per_txt}ans.10251125.random1000.txt"
+    #txt_w_ans_file = f"{out_dir}/xsum.test.{txt_fld}_w_{n_ans_per_txt}ans.random1000.txt"
+    #txt_file = f"{out_dir}/xsum.test.{txt_fld}.txt"
+    #ans_file = f"{out_dir}/xsum.test.{txt_fld}_{n_ans_per_txt}ans.random1000.txt"
 
     # CNN/DM
     #data_file = f"{DATA_DIR}/cnndailymail/fseq/subset1000/subset1000.{txt_fld}.random.ref_order.txt"
@@ -1048,9 +1074,11 @@ def prepare_falke_sent_reranking_data():
 
 def falke_sent_ranking():
     """ """
-    n_qsts = 25
+    n_ans = 10
+    n_qsts = 20
     use_act_ans = True
     use_exp_ans = False
+    bert_version = "bert-large-uncased-whole-word-masking"
     assert not (use_act_ans and use_exp_ans), "Invalid settings!"
 
     if use_act_ans:
@@ -1060,10 +1088,10 @@ def falke_sent_ranking():
     else:
         qst_prefix = "qst"
 
-    correct_gen_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-correct2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-correct2src-5ans-gen.json"
-    correct_src_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-correct2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-correct2src-5ans-src.json"
-    incorrect_gen_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-incorrect2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-incorrect2src-5ans-gen.json"
-    incorrect_src_file = f"{CKPT_DIR}/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-incorrect2src-5ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-incorrect2src-5ans-src.json"
+    correct_gen_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-correct2src-{n_ans}ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-correct2src-{n_ans}ans-gen.json"
+    correct_src_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-correct2src-{n_ans}ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-correct2src-{n_ans}ans-src.json"
+    incorrect_gen_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-incorrect2src-{n_ans}ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-incorrect2src-{n_ans}ans-gen.json"
+    incorrect_src_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/falke-sent-rerank-incorrect2src-{n_ans}ans/bart/prd.{qst_prefix}{n_qsts}-gen-qg-newsqa-ans-beam10.falke-sent-rerank-incorrect2src-{n_ans}ans-src.json"
 
     print("***** Falke sentence ranking experiments *****")
     for metric_name in ["em", "f1"]:
@@ -1090,6 +1118,7 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
     """ Compute sentence and system level correlations
     between human annotations and ROUGE scores
     """
+
 
     # 1 is YES, 2 is NO
     resp_map = {'1': 1, '2': 0}
@@ -1254,20 +1283,37 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         data is (M, N) np.array where M is number of raters, N is the 'unit count'
             - missing values should be np.nan
         """
-        rater2id = {k: i for i, k in enumerate(worker2resps.keys())}
-        all_items = list(set(k for v in worker2resps.values() for k in v.keys() if k in accept_items))
-        item2id = {k: i for i, k in enumerate(all_items)}
+
+        workers_should_count = list()
+        items_should_count = list()
+        for worker, worker_resps in worker2resps.items():
+            for item, resp in worker_resps.items():
+                if item not in accept_items:
+                    continue
+                items_should_count.append(item)
+                workers_should_count.append(worker)
+        workers_should_count = list(set(workers_should_count))
+        items_should_count = list(set(items_should_count))
+
+        rater2id = {k: i for i, k in enumerate(workers_should_count)}
+        item2id = {k: i for i, k in enumerate(items_should_count)}
+        #all_items = list(set(k for v in worker2resps.values() for k in v.keys() if k in accept_items))
         n_raters = len(rater2id)
         n_items = len(item2id)
         data = np.empty((n_raters, n_items))
         data[:] = np.nan
         for worker, worker_resps in worker2resps.items():
+            if worker not in workers_should_count:
+                continue
+
             for item, resp in worker_resps.items():
-                if item not in accept_items:
+                if item not in items_should_count:
                     continue
                 data[rater2id[worker]][item2id[item]] = resp
+
         alpha = krippendorff.alpha(data)
         print(f"Krippendorff: {alpha} ({n_raters} raters, {n_items} items)")
+        print(f"\toriginally {len(worker2resps)} raters")
 
     def compute_rouge_correlation(idxs, scores):
         """Compute ROUGE correlation with some scores
@@ -1382,7 +1428,7 @@ def inspect_qas(src_inp_file, gen_inp_file,
         print(f"src: {qstgen_ctxsrc[idx]['paragraphs'][0]['context']}\n")
         print(f"gen: {qstgen_ctxgen[idx]['paragraphs'][0]['context']}\n")
         print(f"QAs: ")
-        for qa_idx, qa in enumerate(qstgen_ctxgen[idx]['paragraphs'][0]['qas']):
+        for qa_idx, qa in enumerate(qstgen_ctxsrc[idx]['paragraphs'][0]['qas']):
             print(f"qst: {qa['question']}")
             print(f"src ans: {anssrc[str(n_qsts_per_doc * idx + qa_idx)]}")
             print(f"gen ans: {ansgen[str(n_qsts_per_doc * idx + qa_idx)]}")
@@ -1515,68 +1561,50 @@ dataset = "cnndm"
 subset = "random1000"
 gen_mdl = "bus"
 qg_mdl = "bart"
+bert_version = "bert-large-uncased"
 qa_mdl = "qg-newsqa-ans"
 exp_name = f"{dataset}-{subset}"
-n_qsts_per_doc = 10
 n_ans = 10
 reverse_qst = False
 use_src_w_trg = True # xsum only
+
+n_qsts_per_doc = 20
+use_exp_anss = False
+use_act_anss = True
+if use_exp_anss:
+    qst_prefix = f"qst_w_match{n_qsts_per_doc}{bert_version}"
+elif use_act_anss:
+    qst_prefix = f"qst_w_ans{n_qsts_per_doc}{bert_version}"
+else:
+    qst_prefix = f"qst{n_qsts_per_doc}"
 
 src_inp_file = ""
 trg_inp_file = ""
 
 if exp_name == "cnndm-random100":
     exp_d = subset100_data
-    n_qsts_per_doc = 10
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset/prd.qst{n_qsts_per_doc}-gen.cnndm-gen.json"
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset/prd.{qst_prefix}-gen.cnndm-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset/prd.{qst_prefix}-gen.cnndm-gen.json"
 
 elif exp_name == "cnndm-random500":
     exp_d = subset500_data
-    n_qsts_per_doc = 5
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset500/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset500/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset500/prd.{qst_prefix}-ckptbest-gen.cnndm-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset500/prd.{qst_prefix}-ckptbest-gen.cnndm-gen.json"
 
 elif exp_name == "cnndm-random1000":
     exp_d = subset1000_data
-
-    #src_inp_file = f"data/{dataset}/subset1000/bus-subset1000/qst{n_qsts_per_doc}-ckptbest-gen.{dataset}-src.json"
-    #trg_inp_file = f'data/{dataset}/subset1000/bus-subset1000/qst{n_qsts_per_doc}-ckptbest-gen.{dataset}-gen.json'
-    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-src.json"
-    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased-whole-word-masking/squad_v2_0/06-25-2019-v2_0/{gen_mdl}-subset1000/prd.qst{n_qsts_per_doc}-ckptbest-gen.cnndm-gen.json"
-
-    if reverse_qst:
-        src_inp_file = f"data/{dataset}/random1000-{n_ans}ans-reverse/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-src.json"
-        trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans-reverse/qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-gen.json'
-        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-src.json"
-        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.cnndm-random1000-{n_ans}ans-gen.json"
-
-    else:
-        src_inp_file = f"data/{dataset}/random1000-{n_ans}ans/qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-src.json"
-        trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans/qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-gen.json'
-        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-src.json"
-        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-gen.json"
-
+    src_inp_file = f"data/{dataset}/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-src.json"
+    trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-gen.json'
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.{qst_prefix}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.{qst_prefix}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-gen.json"
 
 elif exp_name == "xsum-random1000":
     exp_d = xsum_subset1000_data
-    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-src.json"
-    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen.xsum-random1000-gen.json"
-    #qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-src.json"
-    #qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000/{mdl}/prd.qst{n_qsts_per_doc}-gen-topp0.9.xsum-random1000-gen.json"
-
     src_fld = "src_w_trg" if use_src_w_trg else "src"
-    if reverse_qst:
-        src_inp_file = f"data/xsum/random1000-{n_ans}ans-reverse/qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
-        trg_inp_file = f'data/xsum/random1000-{n_ans}ans-reverse/qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
-        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.xsum-random1000-{n_ans}ans-{src_fld}.json"
-        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10-reverse.xsum-random1000-{n_ans}ans-gen.json"
-
-    else:
-        src_inp_file = f"data/xsum/random1000-{n_ans}ans/qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
-        trg_inp_file = f'data/xsum/random1000-{n_ans}ans/qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
-        qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
-        qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/bert-large-uncased/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.qst_w_ans{n_qsts_per_doc}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json"
+    src_inp_file = f"data/xsum/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
+    trg_inp_file = f'data/xsum/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json"
 
 else:
     raise ValueError(f"Experiment name not found {exp_name}!")
@@ -1598,22 +1626,22 @@ else:
 
 
 ##### MTurk analysis #####
-#compute_correlations_with_human(turk_files=exp_d[gen_mdl],
-#                                ref_file=exp_d["ref"],
-#                                hyp_file=exp_d["hyp"][gen_mdl],
-#                                mdl=gen_mdl,
-#                                qags_src_file=qags_src_file,
-#                                qags_trg_file=qags_trg_file,
-#                                n_qsts_per_doc=n_qsts_per_doc
-#                                )
+compute_correlations_with_human(turk_files=exp_d[gen_mdl],
+                                ref_file=exp_d["ref"],
+                                hyp_file=exp_d["hyp"][gen_mdl],
+                                mdl=gen_mdl,
+                                qags_src_file=qags_src_file,
+                                qags_trg_file=qags_trg_file,
+                                n_qsts_per_doc=n_qsts_per_doc
+                                )
 
-#if src_inp_file and trg_inp_file:
-#    inspect_qas(src_inp_file=src_inp_file,
-#                gen_inp_file=trg_inp_file,
-#                src_out_file=qags_src_file,
-#                gen_out_file=qags_trg_file)
+if src_inp_file and trg_inp_file:
+    inspect_qas(src_inp_file=src_inp_file,
+                gen_inp_file=trg_inp_file,
+                src_out_file=qags_src_file,
+                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
 
 ##### Extra experiments #####
-falke_sent_ranking()
+#falke_sent_ranking()

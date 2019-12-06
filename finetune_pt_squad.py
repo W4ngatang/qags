@@ -37,10 +37,14 @@ from tqdm import tqdm, trange
 
 from tensorboardX import SummaryWriter
 
-from pytorch_pretrained_bert.file_utils import WEIGHTS_NAME, CONFIG_NAME
-from pytorch_pretrained_bert.modeling import BertForQuestionAnswering
-from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
-from pytorch_pretrained_bert.tokenization import BertTokenizer
+#from pytorch_pretrained_bert.file_utils import WEIGHTS_NAME, CONFIG_NAME
+#from pytorch_pretrained_bert.modeling import BertForQuestionAnswering
+#from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
+#from pytorch_pretrained_bert.tokenization import BertTokenizer
+from transformers.file_utils import WEIGHTS_NAME, CONFIG_NAME
+from transformers.modeling_bert import BertForQuestionAnswering
+from transformers.tokenization_bert import BertTokenizer
+from transformers.optimization import AdamW
 
 from run_squad_dataset_utils import read_squad_examples, convert_examples_to_features, RawResult, write_predictions
 
@@ -290,11 +294,16 @@ def main():
             warmup_linear = WarmupLinearSchedule(warmup=args.warmup_proportion,
                                                  t_total=num_train_optimization_steps)
         else:
-            optimizer = BertAdam(optimizer_grouped_parameters,
-                                 lr=args.learning_rate,
-                                 warmup=args.warmup_proportion,
-                                 t_total=num_train_optimization_steps)
-
+            #optimizer = BertAdam(optimizer_grouped_parameters,
+            #                     lr=args.learning_rate,
+            #                     warmup=args.warmup_proportion,
+            #                     t_total=num_train_optimization_steps)
+            optimizer = AdamW(optimizer_grouped_parameters,
+                              lr=args.learning_rate,
+                              warmup=args.warmup_proportion,
+                              t_total=num_train_optimization_steps)
+            num_warmup_steps = int(args.warmup_proportion * num_train_optimization_steps)
+            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=num_warmup_steps, num_training_steps=num_train_optimization_steps)
         global_step = 0
 
         logger.info("***** Running training *****")
@@ -309,7 +318,11 @@ def main():
                 if n_gpu == 1:
                     batch = tuple(t.to(device) for t in batch) # multi-gpu does scattering it-self
                 input_ids, input_mask, segment_ids, start_positions, end_positions = batch
-                loss = model(input_ids, segment_ids, input_mask, start_positions, end_positions)
+                #loss = model(input_ids, segment_ids, input_mask, start_positions, end_positions)
+                outputs = model(input_ids, token_type_ids=segment_ids,
+                                attention_mask=input_mask, start_positions=start_positions,
+                                end_positions=end_positions)
+                loss = outputs[0]
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
                 if args.gradient_accumulation_steps > 1:
@@ -398,7 +411,10 @@ def main():
             input_mask = input_mask.to(device)
             segment_ids = segment_ids.to(device)
             with torch.no_grad():
-                batch_start_logits, batch_end_logits = model(input_ids, segment_ids, input_mask)
+                #batch_start_logits, batch_end_logits = model(input_ids, segment_ids, input_mask)
+                output = model(input_ids, token_type_ids=segment_ids,
+                               attention_mask=input_mask)
+                batch_start_logits, batch_end_logits = output[0], output[1]
             for i, example_index in enumerate(example_indices):
                 start_logits = batch_start_logits[i].detach().cpu().tolist()
                 end_logits = batch_end_logits[i].detach().cpu().tolist()

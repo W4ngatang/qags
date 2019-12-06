@@ -154,12 +154,13 @@ function predict_extractive() {
     ckpt_dir="/misc/vlgscratch4/BowmanGroup/awang/ckpts"
     date="06-25-2019"
     squad_version="v2_0"
+    bert_version="bert-large-uncased"
     ckpt_dir="${ckpt_dir}/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}"
     qg_ckpt="best"
-    n_ans=5
-    n_qsts=25
-    dataset="falke-sent-rerank"
-    subset="incorrect2src-${n_ans}ans"
+    n_ans=10
+    n_qsts=20
+    dataset="cnndm"
+    subset="random1000-${n_ans}ans"
     tmp="${dataset}-${subset}"
     qg_model="qg-newsqa-ans"
     use_all=0
@@ -168,42 +169,49 @@ function predict_extractive() {
     beam=10
     topk=0
     topp=0
-    gpu_id=0
-    batch_size=16
+    gpu_id=1
+    batch_size=32
 
+    # type of question filtering applied
     if [ ${use_all} -eq 1 ]; then
         qst_prefix="qstall"
+        echo "Predicting for all questions!"
     else
         if [ ${use_exp_ans} -eq 1 ]; then
-            qst_prefix="qst_w_match"
+            qst_prefix="qst_w_match${n_qsts}${bert_version}"
         elif [ ${use_act_ans} -eq 1 ]; then
-            qst_prefix="qst_w_ans"
+            qst_prefix="qst_w_ans${n_qsts}${bert_version}"
         else
-            qst_prefix="qst"
+            qst_prefix="qst${n_qsts}"
         fi
-        qst_prefix="${qst_prefix}${n_qsts}"
+        qst_prefix="${qst_prefix}"
     fi
 
-    for txt_fld in src gen; do
+    # decoding type
+    if [ ${topk} -gt 0 ]; then
+        dec_opt="topk${topk}"
+    elif [ ${beam} -gt 0 ]; then
+        dec_opt="beam${beam}"
+    else
+        dec_opt="topp${topp}"
+    fi
+
+    # what text fields to iterate over
+    if [[ ${use_all} -eq 1 ]]; then
+        iter=("gen")
+    elif [[ ${dataset} = "xsum" ]]; then
+        iter=("src_w_trg" "gen")
+    else
+        iter=("src" "gen")
+    fi
+
+    for txt_fld in ${iter[@]}; do
         for qst_src in gen; do
             out_dir="${ckpt_dir}/${tmp}/bart"
             mkdir -p ${out_dir}
 
-            if [ ${use_all} -eq 1 ]; then
-                # TODO(Alex): beam actually can vary
-                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qstall-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
-                echo "Predicting for all questions!"
-            elif [ ${topk} -gt 0 ]; then
-                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-topk${topk}.${tmp}-${txt_fld}.json"
-            elif [ ${beam} -gt 0 ]; then
-                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst_w_ans${n_qsts}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-beam${beam}.${tmp}-${txt_fld}.json"
-            else
-                pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/qst${n_qsts}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
-                out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-topp${topp}.${tmp}-${txt_fld}.json"
-            fi
+            pred_file="/home/awang/projects/qags/data/${dataset}/${subset}/${qst_prefix}-${qst_src}-${qg_model}-${dec_opt}.${tmp}-${txt_fld}.json"
+            out_file="${out_dir}/prd.${qst_prefix}-${qst_src}-${qg_model}-${dec_opt}.${tmp}-${txt_fld}.json"
 
             python finetune_pt_squad.py \
               --local_rank ${gpu_id} \
