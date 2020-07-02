@@ -8,11 +8,24 @@ This repo includes:
 - `allennlp_qa.py`: use AllenNLP pretrained QA models to evaluate questions and summaries. Usage: `python allennlp_qa.py 2>&1 | tee data/bidaf.log`
 - `eval_answers.py`: Evaluate answer spans outputted by `allennlp_qa.py`. Usage: 
 
-## Question Generation Models
+## Usage
 
-- fairseq
+### Generating Questions
 
-## Question Answering Models
+Model based on fairseq
 
-- BiDAF: `allennlp_qa.py`
-- BERT: `scripts/qa_bbp.sh`; based of pytorch-pretrained-BERT
+#### Extracting answer candidates
+
+#### Generating questions
+
+#### Filtering questions
+
+### Answering Questions
+
+Model based on pytorch-pretrained-BERT
+
+### Comparing Answers
+
+
+## Data
+
