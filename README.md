@@ -1,34 +1,44 @@
 # qags
 Question Answering and Generation for Summarization
 
-Some helper scripts for project "Question Answering and Generation for Summarization".
-The meat of the code is actually in fairseq.
-This repo includes:
-- `parse_fseq.py`: Parse fairseq output "logs" for the actual generations, outputting a JSONL containing the generations. Usage: 
-- `allennlp_qa.py`: use AllenNLP pretrained QA models to evaluate questions and summaries. Usage: `python allennlp_qa.py 2>&1 | tee data/bidaf.log`
-- `eval_answers.py`: Evaluate answer spans outputted by `allennlp_qa.py`.
+This is the code for the paper [Asking and Answering Questions to Evaluate the Factual Consistency of Summaries](https://arxiv.org/abs/2004.04228), which will appear at ACL 2020.
+
+The project spans multiple codebases [...]
 
 ## Usage
 
+To compute QAGS scores, we need to
+
+1. generate questions
+2. answer questions
+3. compare answers
+
 ### Generating Questions
 
-Model based on fairseq
+Model based on fairseq: currently in `ckpt_fairseq/fairseq_backup/qg_paracontext/checkpoint_best.pt`
 
 #### Extracting answer candidates
 
-`data_stuff.py:extract_ans`
+We use an answer-conditional question generation model, so we first need to extract answer candidates.
+
+```data_stuff.py:extract_ans
+```
 
 #### Generating questions
 
-In `fairseq-py`, `./scripts/aw/gen_sum.sh`
+To actually generate the questions, we rely on BART finetuned on NewsQA, implemented in fairseq.
+
+```./scripts/aw/gen_sum.sh```
 
 #### Filtering questions
 
-`data_stuff.py:filter_qsts`
+Finally, we filter questions by quality using a number of heuristics.
+
+```data_stuff.py:filter_qsts```
 
 ### Answering Questions
 
-Model based on pytorch-pretrained-BERT
+Model based on pytorch-pretrained-BERT (now `transformers`)
 
 `./scripts/pt_qa.sh predict_extractive`
 
