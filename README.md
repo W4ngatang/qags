@@ -73,4 +73,7 @@ Each line is an article, model-generated summary divided into sentences, and thr
 Each annotation is a binary choice of whether or not the summary sentence is factually supported by the article, 
 as well as an anonymized annotator ID.
 
+For CNNDM, the summarization model is Bottom-Up Summarization ([Gehrmann et al., 2017](https://arxiv.org/abs/1808.10792)).
+For XSUM, the summarization model is BART ([Lewis et al., 2020](https://arxiv.org/abs/1910.13461)) finetuned on the training data.
+
 ```data_stuff.py:compute_correlations_with_human```
