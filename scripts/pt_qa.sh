@@ -118,6 +118,7 @@ function evaluate_v1_1() {
 
 function evaluate_v2_0() {
 
+    bert_version="bert-large-uncased-whole-word-masking"
     date="06-25-2019"
     squad_version="v2_0"
     ckpt_dir="/misc/vlgscratch4/BowmanGroup/awang/ckpts"
@@ -125,7 +126,8 @@ function evaluate_v2_0() {
 	data_file="/misc/vlgscratch4/BowmanGroup/awang/processed_data/squad/v2.0/original/dev.json"
     out_dir="${ckpt_dir}/squad${squad_version}/dev"
 	out_file="${out_dir}/predictions.json"
-    gpu_id=0
+    gpu_id=2
+    batch_size=32
     
     mkdir -p ${out_dir}
 
@@ -136,6 +138,7 @@ function evaluate_v2_0() {
       --do_predict \
       --do_lower_case \
       --predict_file ${data_file} \
+      --predict_batch_size ${batch_size} \
       --max_seq_length 384 \
       --doc_stride 128 \
       --output_dir ${out_dir} \
@@ -156,21 +159,25 @@ function predict_extractive() {
     squad_version="v2_0"
     bert_version="bert-large-uncased"
     ckpt_dir="${ckpt_dir}/ppb/${bert_version}/squad_${squad_version}/${date}-${squad_version}"
-    qg_ckpt="best"
     n_ans=10
     n_qsts=20
-    dataset="cnndm"
-    subset="random1000-${n_ans}ans"
+    dataset="wikinews"
+    dec_method="nhyps10.beam10.diverse10"
+    subset="120519-${n_ans}ans-${dec_method}"
+    #subset="random150-${n_ans}ans-${dec_method}"
+    #subset="random1000-${n_ans}ans"
     tmp="${dataset}-${subset}"
     qg_model="qg-newsqa-ans"
     use_all=0
     use_exp_ans=0
     use_act_ans=1
+    use_hack=0
     beam=10
+    diverse=0
     topk=0
     topp=0
-    gpu_id=1
-    batch_size=32
+    gpu_id=3
+    batch_size=64
 
     # type of question filtering applied
     if [ ${use_all} -eq 1 ]; then
@@ -190,16 +197,23 @@ function predict_extractive() {
     # decoding type
     if [ ${topk} -gt 0 ]; then
         dec_opt="topk${topk}"
+    elif [ ${diverse} -gt 0 ]; then
+        dec_opt="beam${beam}.diverse${diverse}"
     elif [ ${beam} -gt 0 ]; then
         dec_opt="beam${beam}"
     else
         dec_opt="topp${topp}"
+    fi
+    if [ ${use_hack} -gt 0 ]; then
+        dec_opt="${dec_opt}w_hack"
     fi
 
     # what text fields to iterate over
     if [[ ${use_all} -eq 1 ]]; then
         iter=("gen")
     elif [[ ${dataset} = "xsum" ]]; then
+        iter=("src_w_trg" "gen")
+    elif [[ ${dataset} = "wikinews" ]]; then
         iter=("src_w_trg" "gen")
     else
         iter=("src" "gen")

@@ -61,7 +61,7 @@ def set_args():
     args['annotations_per_pair'] = 3
 
     # TODO(Alex): CHANGE ME!!!
-    args['is_sandbox'] = False
+    args['is_sandbox'] = True
     args['qual_percent_hits_approved'] = 98
     args['qual_n_hits_approved'] = 1000
     args['min_time_threshold'] = 30

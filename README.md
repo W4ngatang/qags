@@ -71,4 +71,9 @@ Finally, to get the actual QAGS scores, we compare answers.
 
 ## Data
 
+The crowdsourced annotations of summary sentences we collected are available in `data/mturk_{cnndm,xsum}.jsonl`.
+Each line is an article, model-generated summary divided into sentences, and three annotations per sentence.
+Each annotation is a binary choice of whether or not the summary sentence is factually supported by the article, 
+as well as an anonymized annotator ID.
+
 ```data_stuff.py:compute_correlations_with_human```

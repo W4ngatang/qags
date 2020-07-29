@@ -231,7 +231,7 @@ def get_qags_scores(src_ans_file, trg_ans_file,
     return qags_scores
 
 
-def get_rouge_scores(hyps, refs):
+def get_rouge_scores(hyps, refs, apply_avg=False):
     """ Get ROUGE scores between hyps and refs.
     Computes ROUGE-{1,2,3,4,L} and averages F1 for each.
     """
@@ -240,13 +240,16 @@ def get_rouge_scores(hyps, refs):
                              limit_length=True,
                              length_limit=100,
                              length_limit_type='words',
-                             apply_avg=False,
+                             apply_avg=apply_avg,
                              apply_best=False,
                              alpha=0.5,
                              weight_factor=1.2,
                              stemming=True)
     rouge_d = rouge_eval.get_scores(hyps, refs)
-    rouge_avgs = {k: [vv['f'][0] for vv in v] for k, v in rouge_d.items()}
+    if not apply_avg:
+        rouge_avgs = {k: [vv['f'][0] for vv in v] for k, v in rouge_d.items()}
+    else:
+        rouge_avgs = rouge_d
     return rouge_avgs
 
 
@@ -334,19 +337,22 @@ def aggregate_questions_from_txt():
     and the questions as generated 'hypotheses' (H) """
 
     # Parameters
-    data = 'cnndm'
-    subset = 'random1000'
-    gen_mdl = 'bus'
+    data = 'wikinews'
+    gen_mdl = 'bart'
+    subset = '120519' # NOTE(Alex): IF IT'S 250, IT SHOULD BE 6250!
+    n_exs = 100
     if data == "cnndm":
         data_dir = f"{DATA_DIR}/cnndailymail/fseq"
     elif data == "xsum":
         data_dir = f"{DATA_DIR}/xsum"
     elif data == "falke-sent-rerank":
         data_dir = f"{DATA_DIR}/falke-correctness/sent-rerank"
+    elif data == "wikinews":
+        data_dir = f"{DATA_DIR}/wikinews"
+
     dataset = f'{data}-{subset}'
     qg_model = 'qg-newsqa-ans'
     bert_version = 'bert-large-uncased'
-    n_exs = 1000
     n_qsts = 20 # n questions we actually want to use
     n_gen_qsts = 10 # n questions generated per doc
     n_ans = 10 # n answer candidates
@@ -356,7 +362,11 @@ def aggregate_questions_from_txt():
     beam = 10
     topk = 0
     topp = 0
+    diverse = 0
     reverse_prob = False
+    #dec_method = 'nhyps25.beam25.diverse25'
+    dec_method = 'nhyps10.beam10.diverse10'
+    #dec_method = ''
 
     # Some sanity checks
     if use_all_qsts:
@@ -365,16 +375,18 @@ def aggregate_questions_from_txt():
     # Original texts
     if n_ans > 0:
         dataset = f'{dataset}-{n_ans}ans'
-        src_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src.txt"
-        src_w_trg_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_w_trg.txt" if data == "xsum" else None
-        gen_txt_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}.txt"
-        src_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.src_ans.txt"
-        gen_ans_file = f"{data_dir}/{subset}-{n_ans}ans/test.{gen_mdl}_w_ans.txt"
-
+        data_subdir = f'{subset}-{n_ans}ans-{dec_method}' if dec_method else f'{subset}-{n_ans}ans'
+        src_txt_file = f"{data_dir}/{data_subdir}/test.src.txt"
+        src_w_trg_txt_file = f"{data_dir}/{data_subdir}/test.src_w_trg.txt" if data in ["xsum", "wikinews"] else None
+        gen_txt_file = f"{data_dir}/{data_subdir}/test.{gen_mdl}.txt"
+        src_ans_file = f"{data_dir}/{data_subdir}/test.src_ans.txt"
+        gen_ans_file = f"{data_dir}/{data_subdir}/test.{gen_mdl}_w_ans.txt"
     else:
         # NOTE(Alex): these aren't abstracted / generalized
         src_txt_file = f"{data_dir}/{subset}/src2bart/raw/test.src"
         gen_txt_file = f"{data_dir}/{subset}/bart2src/raw/test.src"
+
+    dataset = f'{dataset}-{dec_method}' if dec_method else dataset
 
     # Files containing all generated questions
     if use_all_qsts:
@@ -390,14 +402,15 @@ def aggregate_questions_from_txt():
         dec_opt = f'topk{topk}'
     elif topp > 0:
         dec_opt = f'topp{topp}'
+    elif diverse:
+        dec_opt = f'beam{beam}.diverse{diverse}'
     else:
         dec_opt = f'beam{beam}'
     src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
     gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
     src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
     gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
-
-    # Predicted answers from QA model
+    dec_opt = f'{dec_opt}'
     src_prd_file = f""
     gen_prd_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-{dec_opt}.{dataset}-gen.json"
 
@@ -412,8 +425,8 @@ def aggregate_questions_from_txt():
         n_gen_qsts *= n_ans
         files["src"]["ans"] = src_ans_file
         files["gen"]["ans"] = gen_ans_file
-    if reverse_prob:
-        out_dir = f"{out_dir}-reverse"
+    out_dir = f"{out_dir}-{dec_method}" if dec_method else out_dir
+    out_dir = f"{out_dir}-reverse" if reverse_prob else out_dir
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     print(f"Reading data from {src_qst_file} and {gen_qst_file}, saving to {out_dir}")
@@ -1072,6 +1085,89 @@ def prepare_falke_sent_reranking_data():
     print(f"\tWrote to {out_dir}")
 
 
+def reranking():
+    """ """
+
+    bert_version = "bert-large-uncased"
+    n_ans = 10
+    n_qsts_per_doc = 20
+    qst_prefix = f"qst_w_ans{n_qsts_per_doc}{bert_version}"
+    qa_mdl = "qg-newsqa-ans"
+    dec_method = "beam10w_hack"
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random100-{n_ans}ans-nhyps25.beam25.diverse25/bart/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.xsum-random100-{n_ans}ans-nhyps25.beam25.diverse25-src_w_trg.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random100-{n_ans}ans-nhyps25.beam25.diverse25/bart/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.xsum-random100-{n_ans}ans-nhyps25.beam25.diverse25-gen.json"
+    #src_file = f"/misc/vlgscratch4/BowmanGroup/awang/processed_data/xsum/random100-nhyps25.beam25.diverse25/test.src_w_trg.txt"
+    src_file = f"/misc/vlgscratch4/BowmanGroup/awang/processed_data/xsum/random100-nhyps25.beam25.diverse25/test.src.txt"
+    trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/processed_data/xsum/random100-nhyps25.beam25.diverse25/test.trg.txt"
+    gen_file = f"/misc/vlgscratch4/BowmanGroup/awang/processed_data/xsum/random100-nhyps25.beam25.diverse25/test.bart.txt"
+
+    scores = get_qags_scores(qags_src_file, qags_trg_file,
+                             metric_name="f1", n_qsts_per_doc=n_qsts_per_doc)
+
+    srcs = load_txt(src_file)
+    trgs = load_txt(trg_file)
+    gens = load_txt(gen_file)
+    assert len(srcs) == len(trgs) == len(scores)
+
+    def inspect(idx, nhyps=25, verbose=True):
+        ss = srcs[idx * nhyps: (idx + 1) * nhyps]
+        tt = trgs[idx * nhyps: (idx + 1) * nhyps]
+        gg = gens[idx * nhyps: (idx + 1) * nhyps]
+        cc = scores[idx * nhyps: (idx + 1) * nhyps]
+        aa = cc.index(max(cc))
+        if verbose:
+            print(f"Context: {ss[0]}")
+            print(f"Original best {cc[0]}: {tt[0]}")
+            print(f"QAGS best {cc[aa]}: {tt[aa]}:")
+        return {
+                'article': ss[0],
+                'target': tt[0],
+                'original': gg[0],
+                'reranked': gg[aa],
+                'rank': aa,
+                'original_qags': cc[0],
+                'reranked_qags': cc[aa]
+               }
+
+    ds = defaultdict(list)
+    for i in range(100):
+        d = inspect(i, verbose=False)
+        for k, v in d.items():
+            ds[k].append(v)
+
+    out_dir = 'data/rerank'
+    for k, v in ds.items():
+        out_file = f'{out_dir}/random100.{k}'
+        with open(out_file, 'w') as out_fh:
+            for vv in v:
+                out_fh.write(f'{vv}\n')
+        print(f'Wrote {out_file}')
+
+    ids = random.choices(range(2), k=100)
+    with open(f'{out_dir}/source_of_random_summary1.txt', 'w') as out_fh, open(f'{out_dir}/random_summary1.txt', 'w') as out_fh1, open(f'{out_dir}/random_summary2.txt', 'w') as out_fh2:
+        for idx, id in enumerate(ids):
+            if id:
+                out_fh.write(f'original\n')
+                out_fh1.write(f'{ds["original"][idx]}\n')
+                out_fh2.write(f'{ds["reranked"][idx]}\n')
+            else:
+                out_fh.write(f'reranked\n')
+                out_fh1.write(f'{ds["reranked"][idx]}\n')
+                out_fh2.write(f'{ds["original"][idx]}\n')
+
+    o_rouges = get_rouge_scores(ds['original'], ds['target'], apply_avg=True)
+    r_rouges = get_rouge_scores(ds['reranked'], ds['target'], apply_avg=True)
+    for k in o_rouges:
+        o_r = np.array(o_rouges[k])
+        r_r = np.array(r_rouges[k])
+        print(f"original {k}: {(o_r)}")
+        print(f"reranked {k}: {(r_r)}")
+
+    ipdb.set_trace()
+
+
+
+
 def falke_sent_ranking():
     """ """
     n_ans = 10
@@ -1114,7 +1210,8 @@ def falke_sent_ranking():
 
 
 def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
-                                    qags_src_file, qags_trg_file, n_qsts_per_doc):
+                                    qags_src_file, qags_trg_file, n_qsts_per_doc,
+                                    src_inp_file, trg_inp_file):
     """ Compute sentence and system level correlations
     between human annotations and ROUGE scores
     """
@@ -1414,6 +1511,45 @@ def compute_correlations_with_human(turk_files, ref_file, hyp_file, mdl,
         print()
 
 
+    # extracting high and low scores
+    print("Getting high and low QAGS scoring examples")
+    k = 10
+    all_qags_scores = get_qags_scores(qags_src_file, qags_trg_file,
+				      metric_name="f1",
+				      n_qsts_per_doc=n_qsts_per_doc)
+    odd_qags_scores = np.array([all_qags_scores[idx] for idx in odd_idxs])
+    odd_qags_and_idxs = [(s, i) for s, i in zip(odd_qags_scores, odd_idxs)]
+    odd_qags_and_idxs.sort(key=lambda x: x[0])
+    odd_humans_and_idxs = [(s, i) for s, i in zip(odd_human_scores, odd_idxs)]
+    odd_humans_and_idxs.sort(key=lambda x: x[0])
+    idxs_by_human = [i for _, i in odd_humans_and_idxs]
+    idxs_by_qags = [i for _, i in odd_qags_and_idxs]
+
+    max_odd_qags_idxs = [odd_idxs[i] for i in odd_qags_scores.argsort()[-10:][::-1]]
+    min_odd_qags_idxs = [odd_idxs[i] for i in (-odd_qags_scores).argsort()[-10:][::-1]]
+
+    qstgen_ctxsrc = json.load(open(src_inp_file))["data"]
+    qstgen_ctxgen = json.load(open(trg_inp_file))["data"]
+    anssrc = json.load(open(qags_src_file))
+    ansgen = json.load(open(qags_trg_file))
+    def inspect(idx):
+        _inspect(idx, qstgen_ctxsrc, qstgen_ctxgen, anssrc, ansgen)
+
+    ipdb.set_trace()
+
+
+
+def _inspect(idx, qstgen_ctxsrc, qstgen_ctxgen, anssrc, ansgen):
+    print(f"src: {qstgen_ctxsrc[idx]['paragraphs'][0]['context']}\n")
+    print(f"gen: {qstgen_ctxgen[idx]['paragraphs'][0]['context']}\n")
+    print(f"QAs: ")
+    for qa_idx, qa in enumerate(qstgen_ctxsrc[idx]['paragraphs'][0]['qas']):
+        print(f"qst {qa_idx}: {qa['question']}")
+        print(f"src ans: {anssrc[str(n_qsts_per_doc * idx + qa_idx)]}")
+        print(f"gen ans: {ansgen[str(n_qsts_per_doc * idx + qa_idx)]}")
+        print()
+
+
 def inspect_qas(src_inp_file, gen_inp_file,
                 src_out_file, gen_out_file):
     """ Inspect QA inputs and outputs
@@ -1424,15 +1560,12 @@ def inspect_qas(src_inp_file, gen_inp_file,
     anssrc = json.load(open(src_out_file))
     ansgen = json.load(open(gen_out_file))
 
+    all_qags_scores = get_qags_scores(src_out_file, gen_out_file,
+				      metric_name="f1",
+				      n_qsts_per_doc=20)
+
     def inspect(idx):
-        print(f"src: {qstgen_ctxsrc[idx]['paragraphs'][0]['context']}\n")
-        print(f"gen: {qstgen_ctxgen[idx]['paragraphs'][0]['context']}\n")
-        print(f"QAs: ")
-        for qa_idx, qa in enumerate(qstgen_ctxsrc[idx]['paragraphs'][0]['qas']):
-            print(f"qst: {qa['question']}")
-            print(f"src ans: {anssrc[str(n_qsts_per_doc * idx + qa_idx)]}")
-            print(f"gen ans: {ansgen[str(n_qsts_per_doc * idx + qa_idx)]}")
-            print()
+        _inspect(idx, qstgen_ctxsrc, qstgen_ctxgen, anssrc, ansgen)
 
     ipdb.set_trace()
 
@@ -1465,6 +1598,162 @@ def mturk_posthoc(is_sandbox=False):
     print(f"max: {times.max()}")
     ipdb.set_trace()
 
+
+def format_mturk_files(turk_files, out_file):
+    """ Compute sentence and system level correlations
+    between human annotations and ROUGE scores
+    """
+
+
+    # 1 is YES, 2 is NO
+    resp_map = {'1': 'yes', '2': 'no'}
+
+    # Load mturk data
+    n_hits, n_rejected_hits, n_total_hits = 0, 0, 0
+    idxs = list()
+    idx2data = dict()
+    idx2responses = defaultdict(lambda: defaultdict(list))
+    worker2resps = defaultdict(dict)
+    for turk_file in turk_files:
+        mturk_data = [ast.literal_eval(l) for l in open(turk_file, encoding="utf-8")]
+        for datum in mturk_data:
+            n_total_hits += 1
+            assert len(datum['worker_data']) == 1, ipdb.set_trace()
+
+            if 'did_fail' in datum and datum['did_fail']:
+                n_rejected_hits += 1
+                continue
+
+            for worker_id, worker in datum['worker_data'].items():
+
+                # Filter out bad reponses
+                bad_resp_flag, short_msg_flag, attn_fail_flag = 0, 0, 0
+                ## filter out returns and discounnects
+                if worker['response']['text'] in MTURK_BAD_RESPONSES:
+                    bad_resp_flag = 1
+                ## filter out short responses
+                if 'task_data' in worker['response']:
+                    for response in worker['response']['task_data']:
+                        if not response.get('textReason', ''):
+                            short_msg_flag = True
+                    ## filter out attn check fails
+                    for task_idx, task in enumerate(worker['task_data']):
+                        if task['conversations'][1].get('answer', None) is not None:
+                            choice = int(worker['response']['task_data'][task_idx]['speakerChoice'])
+                            expected = 1 if task['conversations'][1]['answer'] == 'yes' else 2
+                            if choice != expected:
+                                attn_fail_flag = True
+                # filter out too short time
+                if bad_resp_flag or short_msg_flag or attn_fail_flag:
+                    n_rejected_hits += 1
+                    continue
+
+                n_hits += 1
+                para_idx = tuple(worker['task_data'][0]['conversations'][0]['ex_idx'])[1]
+                sent_idxs = [t['conversations'][1]['ex_idx'][2] for t in worker['task_data']]
+                resps = [d["speakerChoice"] for d in worker['response']['task_data']]
+                for sent_idx, resp in zip(sent_idxs, resps):
+                    idx2responses[para_idx][sent_idx].append({'worker_id': worker_id, 'response': resp_map[resp]})
+                    if sent_idx not in ATTN_IDXS:
+                        worker2resps[worker['worker_id']][(para_idx, sent_idx)] = resp_map[resp]
+                idx2data[para_idx] = worker['task_data'][0]['conversations'][0]['dialog'][0]['text']
+                for task in worker['task_data']:
+                    sent_idx = task['conversations'][1]['ex_idx'][2]
+                    idx2data[(para_idx, sent_idx)] = task['conversations'][1]['dialog'][0]['text']
+                idxs.append(para_idx)
+    idxs = list(set(idxs))
+
+    # Aggregate stuff
+    n_tasks = 0 # n article-sentence pairs
+    n_yes, n_no = 0, 0 # n aggregate yes/no among article-sentence pairs
+    n_all_votes_yes, n_all_votes_no = 0, 0 # n tasks where all voted yes/no
+    n_all_responses_yes, n_all_responses_no = 0, 0 # n articles where all tasks are yes/no
+    human_scores = list() # scores per summary, averaged over sentences
+    odd_human_scores = list() # scores for summaries w/ 3 annotations
+    odd_idxs = list() # idxs of summaries w/ 3 annotations
+    n_responses = defaultdict(int) # n tasks w/ {1,2,3} responses
+    kappas3 = defaultdict(lambda: defaultdict(list))
+    idxs3 = list()
+    for para_idx in idxs:
+        para_d = idx2responses[para_idx]
+        agg_labels = []
+        odd_agg_labels = []
+        n_par_tasks, n_par_yes = 0, 0
+        for sent_idx, votes in para_d.items():
+            if sent_idx in ATTN_IDXS:
+                continue
+            votes = [v['response'] for v in votes]
+            assert votes, "No votes!"
+            votes0 = votes.count('no')
+            votes1 = votes.count('yes')
+            if votes1 >= votes0:
+                agg_labels.append(1)
+                n_yes += 1
+                n_par_yes += 1
+            else:
+                agg_labels.append(0)
+                n_no += 1
+            n_responses[votes0 + votes1] += 1
+
+            # sentence level bookkeeping
+            if votes1 == len(votes):
+                n_all_votes_yes += 1
+            if votes0 == len(votes):
+                n_all_votes_no += 1
+            if len(votes) % 2 == 1 and len(votes) > 1:
+                odd_agg_labels.append(1 if votes1 > votes0 else 0)
+                if para_idx not in odd_idxs:
+                    odd_idxs.append(para_idx)
+                if len(votes) == 3:
+                    kappas3[para_idx][sent_idx] = votes
+                    idxs3.append((para_idx, sent_idx))
+            n_tasks += 1
+            n_par_tasks += 1
+
+        # article level bookkeeping
+        human_scores.append(sum(agg_labels) / len(agg_labels))
+        if odd_agg_labels:
+            odd_human_scores.append(sum(odd_agg_labels) / len(odd_agg_labels))
+        if n_par_yes == n_par_tasks: # attn task
+            n_all_responses_yes += 1
+        if n_par_yes == 0:
+            n_all_responses_no += 1
+
+    print(f"Loaded data from {len(idxs)} articles, {n_tasks} tasks, {n_hits} HITS")
+    print(f"\tn rejected {n_rejected_hits}, n total HITS {n_total_hits}")
+    print(f"\tn_yes responses {n_yes}; n_no responses {n_no}")
+    print(f"\tn tasks all responses yes {n_all_votes_yes}; no {n_all_votes_no}; n_disagreement {n_tasks - n_all_votes_yes - n_all_votes_no}")
+    print(f"\t{len(odd_human_scores)} / {len(human_scores)} ({100 * len(odd_human_scores)/len(human_scores):.2f}%) articles with odd number of labels")
+    print(f"\t{n_all_responses_yes} / {len(idxs)} ({100 * n_all_responses_yes / len(idxs):.2f}%) articles where all tasks are yes")
+    print(f"\t{n_all_responses_no} / {len(idxs)} ({100 * n_all_responses_no / len(idxs):.2f}%) articles where all tasks are no")
+    #print(f"\t{', '.join([str(k) + ':' + str(v) for k, v in n_responses.items()])}")
+    for k, v in n_responses.items():
+        print(f"\t{v} tasks with {k} responses")
+    print()
+
+    # renumber workers
+    old2new_worker_id = {old: new for new, old in enumerate(worker2resps.keys())}
+    idxs3 = set(i[0] for i in idxs3)
+
+    out_ds = []
+    for para_idx, sents in idx2responses.items():
+        if para_idx not in idxs3:
+            continue
+        para_d = {'article': idx2data[para_idx]}
+        sent_ds = []
+        for sent_idx, resps in sents.items():
+            if sent_idx < 0:
+                continue
+            resps_reindexed = [{'worker_id': old2new_worker_id[r['worker_id']], 'response': r['response']} for r in resps]
+            sent_d = {'sentence': idx2data[(para_idx, sent_idx)],
+                      'responses': resps_reindexed}
+            sent_ds.append(sent_d)
+        para_d['summary_sentences'] = sent_ds
+        out_ds.append(para_d)
+
+    with open(out_file, "w") as out_fh:
+        for out_d in out_ds:
+            out_fh.write(f"{json.dumps(out_d)}\n")
 
 
 subset100_data = {
@@ -1557,9 +1846,9 @@ xsum_subset1000_data = {
 }
 
 # Settings
-dataset = "cnndm"
+dataset = "xsum"
 subset = "random1000"
-gen_mdl = "bus"
+gen_mdl = "bart"
 qg_mdl = "bart"
 bert_version = "bert-large-uncased"
 qa_mdl = "qg-newsqa-ans"
@@ -1567,16 +1856,24 @@ exp_name = f"{dataset}-{subset}"
 n_ans = 10
 reverse_qst = False
 use_src_w_trg = True # xsum only
-
 n_qsts_per_doc = 20
 use_exp_anss = False
 use_act_anss = True
+beam = 10
+diverse = 0
+use_hack = 0
 if use_exp_anss:
     qst_prefix = f"qst_w_match{n_qsts_per_doc}{bert_version}"
 elif use_act_anss:
     qst_prefix = f"qst_w_ans{n_qsts_per_doc}{bert_version}"
 else:
     qst_prefix = f"qst{n_qsts_per_doc}"
+
+if diverse:
+    dec_method = f"beam{beam}.diverse{diverse}"
+else:
+    dec_method = f"beam{beam}"
+dec_method = f"{dec_method}w_hack" if use_hack else dec_method
 
 src_inp_file = ""
 trg_inp_file = ""
@@ -1593,18 +1890,25 @@ elif exp_name == "cnndm-random500":
 
 elif exp_name == "cnndm-random1000":
     exp_d = subset1000_data
-    src_inp_file = f"data/{dataset}/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-src.json"
-    trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.{dataset}-random1000-{n_ans}ans-gen.json'
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.{qst_prefix}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-src.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.{qst_prefix}-gen-{qa_mdl}-beam10.cnndm-random1000-{n_ans}ans-gen.json"
+    src_inp_file = f"data/{dataset}/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-{dec_method}.{dataset}-random1000-{n_ans}ans-src.json"
+    trg_inp_file = f'data/{dataset}/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-{dec_method}.{dataset}-random1000-{n_ans}ans-gen.json'
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.cnndm-random1000-{n_ans}ans-src.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/cnndm-random1000-{n_ans}ans/bart/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.cnndm-random1000-{n_ans}ans-gen.json"
 
 elif exp_name == "xsum-random1000":
     exp_d = xsum_subset1000_data
     src_fld = "src_w_trg" if use_src_w_trg else "src"
-    src_inp_file = f"data/xsum/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
-    trg_inp_file = f'data/xsum/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json'
-    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-{src_fld}.json"
-    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-beam10.xsum-random1000-{n_ans}ans-gen.json"
+    src_inp_file = f"data/xsum/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-{dec_method}.xsum-random1000-{n_ans}ans-{src_fld}.json"
+    trg_inp_file = f'data/xsum/random1000-{n_ans}ans/{qst_prefix}-gen-{qa_mdl}-{dec_method}.xsum-random1000-{n_ans}ans-gen.json'
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.xsum-random1000-{n_ans}ans-{src_fld}.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/xsum-random1000-{n_ans}ans/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.xsum-random1000-{n_ans}ans-gen.json"
+
+elif exp_name == "wikinews-120519":
+    src_fld = "src_w_trg" if use_src_w_trg else "src"
+    src_inp_file = f"data/wikinews/120519-10ans-nhyps10.beam10.diverse10/{qst_prefix}-gen-{qa_mdl}-{dec_method}.wikinews-120519-10ans-nhyps10.beam10.diverse10-{src_fld}.json"
+    trg_inp_file = f'data/wikinews/120519-10ans-nhyps10.beam10.diverse10/{qst_prefix}-gen-{qa_mdl}-{dec_method}.wikinews-120519-10ans-nhyps10.beam10.diverse10-gen.json'
+    qags_src_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/wikinews-120519-10ans-nhyps10.beam10.diverse10/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.wikinews-120519-10ans-nhyps10.beam10.diverse10-{src_fld}.json"
+    qags_trg_file = f"/misc/vlgscratch4/BowmanGroup/awang/ckpts/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/wikinews-120519-10ans-nhyps10.beam10.diverse10/{gen_mdl}/prd.{qst_prefix}-gen-{qa_mdl}-{dec_method}.wikinews-120519-10ans-nhyps10.beam10.diverse10-gen.json"
 
 else:
     raise ValueError(f"Experiment name not found {exp_name}!")
@@ -1626,22 +1930,29 @@ else:
 
 
 ##### MTurk analysis #####
-compute_correlations_with_human(turk_files=exp_d[gen_mdl],
-                                ref_file=exp_d["ref"],
-                                hyp_file=exp_d["hyp"][gen_mdl],
-                                mdl=gen_mdl,
-                                qags_src_file=qags_src_file,
-                                qags_trg_file=qags_trg_file,
-                                n_qsts_per_doc=n_qsts_per_doc
-                                )
+format_mturk_files(turk_files=exp_d[gen_mdl],
+                   out_file=f"{dataset}.jsonl")
+#compute_correlations_with_human(turk_files=exp_d[gen_mdl],
+#                                ref_file=exp_d["ref"],
+#                                hyp_file=exp_d["hyp"][gen_mdl],
+#                                mdl=gen_mdl,
+#                                qags_src_file=qags_src_file,
+#                                qags_trg_file=qags_trg_file,
+#                                n_qsts_per_doc=n_qsts_per_doc,
+#                                src_inp_file=src_inp_file,
+#                                trg_inp_file=trg_inp_file
+#                               )
 
-if src_inp_file and trg_inp_file:
-    inspect_qas(src_inp_file=src_inp_file,
-                gen_inp_file=trg_inp_file,
-                src_out_file=qags_src_file,
-                gen_out_file=qags_trg_file)
+#if src_inp_file and trg_inp_file:
+#    inspect_qas(src_inp_file=src_inp_file,
+#                gen_inp_file=trg_inp_file,
+#                src_out_file=qags_src_file,
+#                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
 
 ##### Extra experiments #####
+
 #falke_sent_ranking()
+
+#reranking()
