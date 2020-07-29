@@ -186,7 +186,7 @@ def get_qags_scores(src_ans_file, trg_ans_file,
 
 def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answer outputs from pytorch_pretrained_bert models')
-    parser.add_argument("--command", choices=["compute_qags"], description="Function to perform")
+    parser.add_argument("--command", choices=["compute-qags"], description="Function to perform")
     parser.add_argument('--source-ans-file', type=str)
     parser.add_argument('--target-ans-file', type=str)
     parser.add_argument('--n-qsts-per-doc', type=int, default=5)
@@ -194,7 +194,7 @@ def main(arguments):
     parser.add_argument('--correctness-file', type=str, default=None)
     args = parser.parse_args()
 
-    if args.command == "compute_qags":
+    if args.command == "compute-qags":
         qags_scores = get_qags_scores(args.src_ans_file, args.trg_ans_file, args.ans_similarity_fn)
 
     #srcs = load_data(args.source_ans_file)
