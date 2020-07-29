@@ -171,32 +171,49 @@ def load_correctness(data_file):
     return list(map(lambda x: float(x.strip()), open(data_file).readlines()))
 
 
+def get_qags_scores(src_ans_file, trg_ans_file,
+                    metric_name="em", n_qsts_per_doc=10):
+    """Load answer files and compute similarity scores
+    """
+    srcs = load_data(src_ans_file)
+    trgs = load_data(trg_ans_file)
+    src_ans, trg_ans = align_ans(srcs, trgs)
+    qags_scores, _,  _ = evaluate(tgts=src_ans, prds=trg_ans,
+                                  n_qsts_per_doc=n_qsts_per_doc,
+                                  metric_name=metric_name)
+    return qags_scores
+
+
 def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answer outputs from pytorch_pretrained_bert models')
+    parser.add_argument("--command", choices=["compute_qags"], description="Function to perform")
     parser.add_argument('--source-ans-file', type=str)
     parser.add_argument('--target-ans-file', type=str)
     parser.add_argument('--n-qsts-per-doc', type=int, default=5)
-    parser.add_argument('--outdir', type=str, default=None)
+    parser.add_argument('--out_dir', type=str, default=None)
     parser.add_argument('--correctness-file', type=str, default=None)
     args = parser.parse_args()
 
-    srcs = load_data(args.source_ans_file)
-    trgs = load_data(args.target_ans_file)
-    src_ans, trg_ans = align_ans(srcs, trgs)
-    count_noans(src_ans, trg_ans)
-    for metric in ['em', 'f1', 'ed']:
-        scores, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans,
-                                             metric_name=metric,
-                                             n_qsts_per_doc=args.n_qsts_per_doc)
-        print(f"Tgt {metric}: mean {np.mean(scores)}, std {np.std(scores)}")
-        if args.outdir is not None:
-            json.dump(scores, open(os.path.join(args.outdir, f"{metric}_scores.json"), "w"))
+    if args.command == "compute_qags":
+        qags_scores = get_qags_scores(args.src_ans_file, args.trg_ans_file, args.ans_similarity_fn)
 
-    if args.correctness_file is not None:
-        correctness = load_correctness(args.correctness_file)
-        corr, pval = pearsonr(scores[:50], correctness)
-        print(f"Pearson corr wrt {args.correctness_file}: {corr} (p-val {pval})")
-        #print(f"# incorrect: {sum(1 - c for c in correctness) / len(correctness)}")
+    #srcs = load_data(args.source_ans_file)
+    #trgs = load_data(args.target_ans_file)
+    #src_ans, trg_ans = align_ans(srcs, trgs)
+    #count_noans(src_ans, trg_ans)
+    #for metric in ['em', 'f1', 'ed']:
+    #    scores, good_tgt, bad_tgt = evaluate(tgts=src_ans, prds=trg_ans,
+    #                                         metric_name=metric,
+    #                                         n_qsts_per_doc=args.n_qsts_per_doc)
+    #    print(f"Tgt {metric}: mean {np.mean(scores)}, std {np.std(scores)}")
+    #    if args.outdir is not None:
+    #        json.dump(scores, open(os.path.join(args.outdir, f"{metric}_scores.json"), "w"))
+
+    #if args.correctness_file is not None:
+    #    correctness = load_correctness(args.correctness_file)
+    #    corr, pval = pearsonr(scores[:50], correctness)
+    #    print(f"Pearson corr wrt {args.correctness_file}: {corr} (p-val {pval})")
+    #    #print(f"# incorrect: {sum(1 - c for c in correctness) / len(correctness)}")
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
