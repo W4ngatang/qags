@@ -1550,7 +1550,6 @@ def _inspect(idx, qstgen_ctxsrc, qstgen_ctxgen, anssrc, ansgen):
         print()
 
 
-
 def inspect_qas(src_inp_file, gen_inp_file,
                 src_out_file, gen_out_file):
     """ Inspect QA inputs and outputs
@@ -1599,6 +1598,162 @@ def mturk_posthoc(is_sandbox=False):
     print(f"max: {times.max()}")
     ipdb.set_trace()
 
+
+def format_mturk_files(turk_files, out_file):
+    """ Compute sentence and system level correlations
+    between human annotations and ROUGE scores
+    """
+
+
+    # 1 is YES, 2 is NO
+    resp_map = {'1': 'yes', '2': 'no'}
+
+    # Load mturk data
+    n_hits, n_rejected_hits, n_total_hits = 0, 0, 0
+    idxs = list()
+    idx2data = dict()
+    idx2responses = defaultdict(lambda: defaultdict(list))
+    worker2resps = defaultdict(dict)
+    for turk_file in turk_files:
+        mturk_data = [ast.literal_eval(l) for l in open(turk_file, encoding="utf-8")]
+        for datum in mturk_data:
+            n_total_hits += 1
+            assert len(datum['worker_data']) == 1, ipdb.set_trace()
+
+            if 'did_fail' in datum and datum['did_fail']:
+                n_rejected_hits += 1
+                continue
+
+            for worker_id, worker in datum['worker_data'].items():
+
+                # Filter out bad reponses
+                bad_resp_flag, short_msg_flag, attn_fail_flag = 0, 0, 0
+                ## filter out returns and discounnects
+                if worker['response']['text'] in MTURK_BAD_RESPONSES:
+                    bad_resp_flag = 1
+                ## filter out short responses
+                if 'task_data' in worker['response']:
+                    for response in worker['response']['task_data']:
+                        if not response.get('textReason', ''):
+                            short_msg_flag = True
+                    ## filter out attn check fails
+                    for task_idx, task in enumerate(worker['task_data']):
+                        if task['conversations'][1].get('answer', None) is not None:
+                            choice = int(worker['response']['task_data'][task_idx]['speakerChoice'])
+                            expected = 1 if task['conversations'][1]['answer'] == 'yes' else 2
+                            if choice != expected:
+                                attn_fail_flag = True
+                # filter out too short time
+                if bad_resp_flag or short_msg_flag or attn_fail_flag:
+                    n_rejected_hits += 1
+                    continue
+
+                n_hits += 1
+                para_idx = tuple(worker['task_data'][0]['conversations'][0]['ex_idx'])[1]
+                sent_idxs = [t['conversations'][1]['ex_idx'][2] for t in worker['task_data']]
+                resps = [d["speakerChoice"] for d in worker['response']['task_data']]
+                for sent_idx, resp in zip(sent_idxs, resps):
+                    idx2responses[para_idx][sent_idx].append({'worker_id': worker_id, 'response': resp_map[resp]})
+                    if sent_idx not in ATTN_IDXS:
+                        worker2resps[worker['worker_id']][(para_idx, sent_idx)] = resp_map[resp]
+                idx2data[para_idx] = worker['task_data'][0]['conversations'][0]['dialog'][0]['text']
+                for task in worker['task_data']:
+                    sent_idx = task['conversations'][1]['ex_idx'][2]
+                    idx2data[(para_idx, sent_idx)] = task['conversations'][1]['dialog'][0]['text']
+                idxs.append(para_idx)
+    idxs = list(set(idxs))
+
+    # Aggregate stuff
+    n_tasks = 0 # n article-sentence pairs
+    n_yes, n_no = 0, 0 # n aggregate yes/no among article-sentence pairs
+    n_all_votes_yes, n_all_votes_no = 0, 0 # n tasks where all voted yes/no
+    n_all_responses_yes, n_all_responses_no = 0, 0 # n articles where all tasks are yes/no
+    human_scores = list() # scores per summary, averaged over sentences
+    odd_human_scores = list() # scores for summaries w/ 3 annotations
+    odd_idxs = list() # idxs of summaries w/ 3 annotations
+    n_responses = defaultdict(int) # n tasks w/ {1,2,3} responses
+    kappas3 = defaultdict(lambda: defaultdict(list))
+    idxs3 = list()
+    for para_idx in idxs:
+        para_d = idx2responses[para_idx]
+        agg_labels = []
+        odd_agg_labels = []
+        n_par_tasks, n_par_yes = 0, 0
+        for sent_idx, votes in para_d.items():
+            if sent_idx in ATTN_IDXS:
+                continue
+            votes = [v['response'] for v in votes]
+            assert votes, "No votes!"
+            votes0 = votes.count('no')
+            votes1 = votes.count('yes')
+            if votes1 >= votes0:
+                agg_labels.append(1)
+                n_yes += 1
+                n_par_yes += 1
+            else:
+                agg_labels.append(0)
+                n_no += 1
+            n_responses[votes0 + votes1] += 1
+
+            # sentence level bookkeeping
+            if votes1 == len(votes):
+                n_all_votes_yes += 1
+            if votes0 == len(votes):
+                n_all_votes_no += 1
+            if len(votes) % 2 == 1 and len(votes) > 1:
+                odd_agg_labels.append(1 if votes1 > votes0 else 0)
+                if para_idx not in odd_idxs:
+                    odd_idxs.append(para_idx)
+                if len(votes) == 3:
+                    kappas3[para_idx][sent_idx] = votes
+                    idxs3.append((para_idx, sent_idx))
+            n_tasks += 1
+            n_par_tasks += 1
+
+        # article level bookkeeping
+        human_scores.append(sum(agg_labels) / len(agg_labels))
+        if odd_agg_labels:
+            odd_human_scores.append(sum(odd_agg_labels) / len(odd_agg_labels))
+        if n_par_yes == n_par_tasks: # attn task
+            n_all_responses_yes += 1
+        if n_par_yes == 0:
+            n_all_responses_no += 1
+
+    print(f"Loaded data from {len(idxs)} articles, {n_tasks} tasks, {n_hits} HITS")
+    print(f"\tn rejected {n_rejected_hits}, n total HITS {n_total_hits}")
+    print(f"\tn_yes responses {n_yes}; n_no responses {n_no}")
+    print(f"\tn tasks all responses yes {n_all_votes_yes}; no {n_all_votes_no}; n_disagreement {n_tasks - n_all_votes_yes - n_all_votes_no}")
+    print(f"\t{len(odd_human_scores)} / {len(human_scores)} ({100 * len(odd_human_scores)/len(human_scores):.2f}%) articles with odd number of labels")
+    print(f"\t{n_all_responses_yes} / {len(idxs)} ({100 * n_all_responses_yes / len(idxs):.2f}%) articles where all tasks are yes")
+    print(f"\t{n_all_responses_no} / {len(idxs)} ({100 * n_all_responses_no / len(idxs):.2f}%) articles where all tasks are no")
+    #print(f"\t{', '.join([str(k) + ':' + str(v) for k, v in n_responses.items()])}")
+    for k, v in n_responses.items():
+        print(f"\t{v} tasks with {k} responses")
+    print()
+
+    # renumber workers
+    old2new_worker_id = {old: new for new, old in enumerate(worker2resps.keys())}
+    idxs3 = set(i[0] for i in idxs3)
+
+    out_ds = []
+    for para_idx, sents in idx2responses.items():
+        if para_idx not in idxs3:
+            continue
+        para_d = {'article': idx2data[para_idx]}
+        sent_ds = []
+        for sent_idx, resps in sents.items():
+            if sent_idx < 0:
+                continue
+            resps_reindexed = [{'worker_id': old2new_worker_id[r['worker_id']], 'response': r['response']} for r in resps]
+            sent_d = {'sentence': idx2data[(para_idx, sent_idx)],
+                      'responses': resps_reindexed}
+            sent_ds.append(sent_d)
+        para_d['summary_sentences'] = sent_ds
+        out_ds.append(para_d)
+
+    with open(out_file, "w") as out_fh:
+        for out_d in out_ds:
+            out_fh.write(f"{json.dumps(out_d)}\n")
 
 
 subset100_data = {
@@ -1691,8 +1846,8 @@ xsum_subset1000_data = {
 }
 
 # Settings
-dataset = "wikinews"
-subset = "120519"
+dataset = "xsum"
+subset = "random1000"
 gen_mdl = "bart"
 qg_mdl = "bart"
 bert_version = "bert-large-uncased"
@@ -1775,6 +1930,8 @@ else:
 
 
 ##### MTurk analysis #####
+format_mturk_files(turk_files=exp_d[gen_mdl],
+                   out_file=f"{dataset}.jsonl")
 #compute_correlations_with_human(turk_files=exp_d[gen_mdl],
 #                                ref_file=exp_d["ref"],
 #                                hyp_file=exp_d["hyp"][gen_mdl],
@@ -1784,13 +1941,13 @@ else:
 #                                n_qsts_per_doc=n_qsts_per_doc,
 #                                src_inp_file=src_inp_file,
 #                                trg_inp_file=trg_inp_file
-#                                )
-#
-if src_inp_file and trg_inp_file:
-    inspect_qas(src_inp_file=src_inp_file,
-                gen_inp_file=trg_inp_file,
-                src_out_file=qags_src_file,
-                gen_out_file=qags_trg_file)
+#                               )
+
+#if src_inp_file and trg_inp_file:
+#    inspect_qas(src_inp_file=src_inp_file,
+#                gen_inp_file=trg_inp_file,
+#                src_out_file=qags_src_file,
+#                gen_out_file=qags_trg_file)
 
 #mturk_posthoc()
 
