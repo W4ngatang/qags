@@ -38,7 +38,7 @@ from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
                   filter_line_fseq, parse_generation, \
                   load_txt, load_json
-from eval_ppb_answers import evaluate, load_data, align_ans, count_noans
+from qa_utils import evaluate, load_data, align_ans, count_noans
 
 N_SAMPLES = 5
 ATTN_IDXS = [-2, -3]
