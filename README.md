@@ -24,8 +24,7 @@ Model based on fairseq: currently in `ckpt_fairseq/fairseq_backup/qg_paracontext
 
 We use an answer-conditional question generation model, so we first need to extract answer candidates.
 
-```python qg_utils.py --command extract_ans --data_dir ${DATA_DIR}
-```
+```python qg_utils.py --command extract_ans --data_dir ${DATA_DIR}```
 
 #### Generating questions
 
@@ -49,26 +48,24 @@ We use a QA model to answer the generated questions, and if the predicted answer
 To do this, we need to run the QA model on the generated questions (see next section for commands to do so), which will produce an answer file.
 
 To do the actual filtering, we run the following:
-```python qg_utils.py --command filter_qsts --data_dir ${DATA_DIR}
-```
+```python qg_utils.py --command filter_qsts --data_dir ${DATA_DIR}```
 
 
 ### Answering Questions
 
 Model based on pytorch-pretrained-BERT (now `transformers`)
 
-`./scripts/pt_qa.sh predict_extractive`
+```./scripts/pt_qa.sh predict_extractive```
 
 
 ### Comparing Answers
 
 Finally, to get the actual QAGS scores, we compare answers.
 
-```python qa_utils.py --command compute_qags --src-ans-file ${src_ans_file} --trg-ans-file ${trg_ans_file}
-```
+```python qa_utils.py --command compute_qags --src-ans-file ${src_ans_file} --trg-ans-file ${trg_ans_file}```
 
 
 
 ## Data
 
-`data_stuff.py:compute_correlations_with_human`
+```data_stuff.py:compute_correlations_with_human```
