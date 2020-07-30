@@ -54,11 +54,23 @@ To do the actual filtering, we run the following:
 
 ### Answering Questions
 
-To evaluate our QA models, use the following command. 
-Our models are based on `pytorch-pretrained-BERT` (now `transformers`). Model files are located at TODO(Alex).
-To compute QAGS scores, evaluate the QA model using the both the article as context and the summary as context.
+TODO(Alex): data processing
 
-```./scripts/pt_qa.sh predict_extractive```
+To evaluate our QA models, use the following command to evaluate the model on `pred_file` and write the predictions to `out_dir/out_file`
+Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](TODO).
+To compute QAGS scores, evaluate the QA model using the both the article as context and the summary as context, so you will need to run this command twice.
+
+```python finetune_pt_squad.py \
+              --bert_model bert-large-uncased \
+              --load_model_from_dir ${model_dir} \
+              --version_2_with_negative \
+              --do_lower_case \
+              --do_predict \
+              --predict_file ${pred_file} \
+              --output_dir ${out_dir} \
+              --prediction_file ${out_file} \
+              --overwrite_output_dir
+ ```
 
 
 ### Comparing Answers

@@ -176,7 +176,7 @@ function predict_extractive() {
     diverse=0
     topk=0
     topp=0
-    gpu_id=3
+    gpu_id=4
     batch_size=64
 
     # type of question filtering applied
