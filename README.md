@@ -28,14 +28,12 @@ We use an answer-conditional question generation model, so we first need to extr
 #### Generating questions
 
 To actually generate the questions, we rely on BART finetuned on NewsQA, implemented in fairseq.
-Model based on fairseq: currently in `ckpt_fairseq/fairseq_backup/qg_paracontext/checkpoint_best.pt`
+Code, model, and instructions for doing so are available [here](https://github.com/W4ngatang/qags_fairseq).
 
 To generate from these models, we must first preprocess the data (tokenize and binarize) using the following command:
 ```./scripts/aw/preprocess.sh preprocess```
 
 Make sure to change `dat_dir` to point to the directory containing your files, which should be named `{train, valid, test}.txt`
-
-TODO(Alex): make sure we have the model dictionary file
 
 Then to generate, use the following command.
 ```./scripts/aw/gen_sum.sh```
@@ -54,13 +52,15 @@ To do the actual filtering, we run the following:
 
 ### Answering Questions
 
-TODO(Alex): data processing
+TODO(Alex): data processing and formatting
 
 To evaluate our QA models, use the following command to evaluate the model on `pred_file` and write the predictions to `out_dir/out_file`
 Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](TODO).
+Make sure `model_dir` points to the QA model directory.
 To compute QAGS scores, evaluate the QA model using the both the article as context and the summary as context, so you will need to run this command twice.
 
-```python finetune_pt_squad.py \
+```
+python finetune_pt_squad.py \
               --bert_model bert-large-uncased \
               --load_model_from_dir ${model_dir} \
               --version_2_with_negative \
@@ -70,7 +70,7 @@ To compute QAGS scores, evaluate the QA model using the both the article as cont
               --output_dir ${out_dir} \
               --prediction_file ${out_file} \
               --overwrite_output_dir
- ```
+```
 
 
 ### Comparing Answers
