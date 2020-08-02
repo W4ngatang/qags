@@ -3,6 +3,8 @@ Question Answering and Generation for Summarization
 
 This is the code for the paper [Asking and Answering Questions to Evaluate the Factual Consistency of Summaries](https://arxiv.org/abs/2004.04228), which appeared at ACL 2020.
 
+The project spans multiple codebases [...]
+
 
 
 ## Usage
@@ -14,7 +16,7 @@ To compute QAGS scores, we need to
 3. compare answers
 
 
-### 1. Generating Questions
+### Generating Questions
 
 
 #### Extracting answer candidates
@@ -48,7 +50,7 @@ To do the actual filtering, we run the following:
 ```python qg_utils.py --command filter_qsts --data_dir ${DATA_DIR}```
 
 
-### 2. Answering Questions
+### Answering Questions
 
 TODO(Alex): data processing and formatting
 
@@ -71,7 +73,7 @@ python finetune_pt_squad.py \
 ```
 
 
-### 3. Comparing Answers
+### Comparing Answers
 
 Finally, to get the actual QAGS scores, we compare answers.
 
