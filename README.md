@@ -1,7 +1,7 @@
 # qags
 Question Answering and Generation for Summarization
 
-This is the code for the paper [Asking and Answering Questions to Evaluate the Factual Consistency of Summaries](https://arxiv.org/abs/2004.04228), which will appear at ACL 2020.
+This is the code for the paper [Asking and Answering Questions to Evaluate the Factual Consistency of Summaries](https://arxiv.org/abs/2004.04228), which appeared at ACL 2020.
 
 
 
@@ -26,7 +26,7 @@ We use an answer-conditional question generation model, so we first need to extr
 #### Generating questions
 
 To actually generate the questions, we rely on BART finetuned on NewsQA, implemented in fairseq.
-Code, model, and instructions for doing so are available [here](https://github.com/W4ngatang/qags_fairseq).
+Code, model, and instructions for doing so are available [here](https://github.com/W4ngatang/qags/fairseq).
 
 To generate from these models, we must first preprocess the data (tokenize and binarize) using the following command:
 ```./scripts/aw/preprocess.sh preprocess```
@@ -87,6 +87,22 @@ Each annotation is a binary choice of whether or not the summary sentence is fac
 as well as an anonymized annotator ID.
 
 For CNNDM, the summarization model is Bottom-Up Summarization ([Gehrmann et al., 2017](https://arxiv.org/abs/1808.10792)).
-For XSUM, the summarization model is BART ([Lewis et al., 2020](https://arxiv.org/abs/1910.13461)) finetuned on the training data.
+For XSUM, the summarization model is BART ([Lewis et al., 2020](https://arxiv.org/abs/1910.13461)) finetuned on the XSUM training data.
 
 ```data_stuff.py:compute_correlations_with_human```
+
+
+## Citation
+
+If you use this code or data, please cite us.
+
+@article{Wang_2020,
+   title={Asking and Answering Questions to Evaluate the Factual Consistency of Summaries},
+   url={http://dx.doi.org/10.18653/v1/2020.acl-main.450},
+   DOI={10.18653/v1/2020.acl-main.450},
+   journal={Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics},
+   publisher={Association for Computational Linguistics},
+   author={Wang, Alex and Cho, Kyunghyun and Lewis, Mike},
+   year={2020}
+}
+
