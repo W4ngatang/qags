@@ -3,9 +3,6 @@ Question Answering and Generation for Summarization
 
 This is the code for the paper [Asking and Answering Questions to Evaluate the Factual Consistency of Summaries](https://arxiv.org/abs/2004.04228), which appeared at ACL 2020.
 
-The project spans multiple codebases [...]
-
-
 
 ## Usage
 
@@ -16,7 +13,7 @@ To compute QAGS scores, we need to
 3. compare answers
 
 
-### Generating Questions
+### 1. Generating Questions
 
 
 #### Extracting answer candidates
@@ -50,7 +47,9 @@ To do the actual filtering, we run the following:
 ```python qg_utils.py --command filter_qsts --data_dir ${DATA_DIR}```
 
 
-### Answering Questions
+
+
+### 2. Answering Questions
 
 TODO(Alex): data processing and formatting
 
@@ -73,7 +72,8 @@ python finetune_pt_squad.py \
 ```
 
 
-### Comparing Answers
+
+### 3. Comparing Answers
 
 Finally, to get the actual QAGS scores, we compare answers.
 
@@ -98,6 +98,7 @@ For XSUM, the summarization model is BART ([Lewis et al., 2020](https://arxiv.or
 
 If you use this code or data, please cite us.
 
+```
 @article{Wang_2020,
    title={Asking and Answering Questions to Evaluate the Factual Consistency of Summaries},
    url={http://dx.doi.org/10.18653/v1/2020.acl-main.450},
@@ -107,4 +108,4 @@ If you use this code or data, please cite us.
    author={Wang, Alex and Cho, Kyunghyun and Lewis, Mike},
    year={2020}
 }
-
+```
