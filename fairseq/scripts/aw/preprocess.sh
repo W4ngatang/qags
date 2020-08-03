@@ -1,32 +1,28 @@
 # Preprocessed tokenized and possibly BPE-ed text
 
 function preprocess() {
-    # raw text -> tokenized -> binarized
-    #for mdl in lstm lstmsmall lstmsmalltied tfmr; do
-    #for mdl in bus fan pgc; do
-    for mdl in src; do
+    #dict_file="/private/home/wangalexc/data/cnndailymail/fseq/dict.txt"
+    #dict_file="${PROC}/cnndailymail/fseq/dict.txt"
+    dict_file="models/fseq/dict.txt"
+    data="tmp"
 
-        #dict_file="/private/home/wangalexc/data/cnndailymail/fseq/dict.txt"
-        dict_file="${PROC}/cnndailymail/fseq/dict.txt"
-        data="src2trg"
+    #dat_dir="/private/home/wangalexc/data/cnndailymail/fseq/labeled-subset/${data}"
+    dat_dir="${PROC}/cnndailymail/fseq/labeled-subset/${data}"
+    tok_dir="${dat_dir}/tokenized"
+    out_dir="${dat_dir}/processed"
+    mkdir -p ${tok_dir}
+    mkdir -p ${out_dir}
 
-        #dat_dir="/private/home/wangalexc/data/cnndailymail/fseq/labeled-subset/${data}"
-        dat_dir="${PROC}/cnndailymail/fseq/labeled-subset/${data}"
-        tok_dir="${dat_dir}/tmp/tokenized"
-        out_dir="${dat_dir}/tmp/processed"
-        mkdir -p ${tok_dir}
-        mkdir -p ${out_dir}
+    # tokenize
+    python fairseq/prepreprocess.py --bert-version bert-base-uncased --data-dir ${dat_dir} --out-dir ${tok_dir}
 
-        # tokenize
-        python prepreprocess.py --bert-version bert-base-uncased --data-dir ${dat_dir} --out-dir ${tok_dir}
-
-        # preprocess: index, binarize
-        python preprocess.py --source-lang src --target-lang trg \
-                             --trainpref ${tok_dir}/train.tok --validpref ${tok_dir}/valid.tok --testpref ${tok_dir}/test.tok \
-                             --destdir ${out_dir} --thresholdtgt 10 --thresholdsrc 10 \
-                             --srcdict ${dict_file} --tgtdict ${dict_file} \
-                             --padding-factor 1 --workers 48;
-    done
+    # preprocess: index, binarize
+    python fairseq/preprocess.py --source-lang src --target-lang trg \
+                                 --testpref ${tok_dir}/test.tok \
+                                 --destdir ${out_dir} --thresholdtgt 10 --thresholdsrc 10 \
+                                 --srcdict ${dict_file} --tgtdict ${dict_file} \
+                                 --padding-factor 1 --workers 48;
+                                 #--trainpref ${tok_dir}/train.tok --validpref ${tok_dir}/valid.tok --testpref ${tok_dir}/test.tok \
 
 }
 

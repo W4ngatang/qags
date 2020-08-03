@@ -34,36 +34,39 @@ To generate the questions, we rely on [BART](https://arxiv.org/abs/1910.13461) f
 A frozen version of `fairseq` for doing so is available in [`qags/fairseq`](https://github.com/W4ngatang/qags/fairseq).
 Our pretrained QG model is available [here](TODO).
 
-To generate from these models, we must first preprocess the data (tokenize and binarize) using the following command:
-```./scripts/aw/preprocess.sh preprocess```
+To generate from these models, we must first preprocess the data (tokenize and binarize) using the command:
+`./fairseq/scripts/aw/preprocess.sh preprocess`.
+In the script, make sure to change `dat_dir` to point to the directory containing your files.
+The script expects `dat_dir` to contain `test.src` and `test.trg`, where `test.src` are the files that will actually 
+be fed into the QG model to generate from; `test.trg` can be a dummy file with the same number of lines (e.g., a copy of `test.src`).
 
-Make sure to change `dat_dir` to point to the directory containing your files, which should be named `{train, valid, test}.txt`
+Then to generate, use command `./scripts/aw/gen_sum.sh`. 
+Change `model_path` to point to the pretrained QG checkpoint,
+`data_path` to the directory containing the processed data (typically the `processed` directory created during preprocessing),
+and `out_file` for the file to log to.
+Due to a code quirk, in `fairseq/fairseq/models/summerization_encoder_only.py`, set `HACK_PATH` (line 107) to the `best_pretrained_bert.pt` checkpoint.
 
-Then to generate, use the following command.
-```./scripts/aw/gen_sum.sh```
-
-#### Filtering questions
-
-Finally, we filter questions by quality using a number of heuristics.
-Most importantly, we filter questions by enforcing answer consistency: 
-We use a QA model to answer the generated questions, and if the predicted answer doesn't match the original answer, we throw out the question.
-To do this, we need to run the QA model on the generated questions (see next section), which will produce an answer file.
-After having done so, TODO(Alex): instructions for using answer filtering once computed.
-
-To do the actual filtering, we run the following:
-```python qg_utils.py --command filter_qsts --data_dir ${DATA_DIR}```
-
-
+Finally, extract the generated questions using `python qg_utils.py --command extract-qst` (TODO(Alex)).
 
 
 ### 2. Answering Questions
 
-TODO(Alex): data processing and formatting
+To prepare the QA data, use `python qa_utils.py --command format-data`. (TODO(Alex))
+
+As part of this step, we filter questions by quality using a number of heuristics.
+Most importantly, we filter questions by enforcing answer consistency: 
+We use a QA model to answer the generated questions, and if the predicted answer doesn't match the original answer, we throw out the question.
+To do this, we need to run the QA model on the generated questions, which will produce an answer file.
+For this step, use the flag `--use_all_qsts` and then run the QA model on the resulting data file.
+
+Once you have answers for each question, we need to compare the expected and predicted answers, 
+which we do so by TODO(Alex): instructions for using answer filtering once computed.
 
 To evaluate our QA models, use the following command to evaluate the model on `pred_file` and write the predictions to `out_dir/out_file`
 Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](TODO).
 Make sure `model_dir` points to the QA model directory.
 To compute QAGS scores, evaluate the QA model using the both the article as context and the summary as context, so you will need to run this command twice.
+
 
 ```
 python finetune_pt_squad.py \
@@ -83,8 +86,14 @@ python finetune_pt_squad.py \
 ### 3. Comparing Answers
 
 Finally, to get the actual QAGS scores, we compare answers.
+The following command will write the scores to `out_dir/qags_scores.txt`.
 
-```python qa_utils.py --command compute-qags --src-ans-file ${src_ans_file} --trg-ans-file ${trg_ans_file}```
+```
+python qa_utils.py --command compute-qags \
+                   --src-ans-file ${src_ans_file} \
+                   --trg-ans-file ${trg_ans_file} \
+                   --out-dir ${out_dir}
+```
 
 
 

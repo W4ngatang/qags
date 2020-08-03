@@ -1930,8 +1930,8 @@ else:
 
 
 ##### MTurk analysis #####
-format_mturk_files(turk_files=exp_d[gen_mdl],
-                   out_file=f"{dataset}.jsonl")
+#format_mturk_files(turk_files=exp_d[gen_mdl],
+#                   out_file=f"{dataset}.jsonl")
 #compute_correlations_with_human(turk_files=exp_d[gen_mdl],
 #                                ref_file=exp_d["ref"],
 #                                hyp_file=exp_d["hyp"][gen_mdl],

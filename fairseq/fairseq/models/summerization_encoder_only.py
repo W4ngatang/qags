@@ -104,7 +104,7 @@ class FTSummerization(BaseFairseqModel):
         args.short_seq_prob = 0.0
         task = BertTask(args, dictionary)
         #HACK_PATH = "/checkpoint/wangalexc/fairseq/bert-pretrained/20190520/checkpoint_best.pt"
-        HACK_PATH = "models/bert-pretrained/checkpoint_best.pt"
+        HACK_PATH = "/misc/vlgscratch4/BowmanGroup/awang/ckpts/fairseq/bert/best_pretrained_bert.pt"
         models, _ = utils.load_ensemble_for_inference([HACK_PATH], task, {'save_masks' : False})
         #models, _ = utils.load_ensemble_for_inference([args.bert_path], task, {'save_masks' : False})
         assert len(models) == 1, 'ensembles are currently not supported for elmo embeddings'

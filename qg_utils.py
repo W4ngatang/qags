@@ -196,9 +196,97 @@ def prepare_ans_conditional_data(data_file,
     print(f"\tWrote {len(txts_w_ans)} sentences to {txt_w_ans_file}")
 
 
+def extract_src_trg_gen_from_fseq_log():
+    """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
+    from fseq logs and write each as a text file, one text per line. """
+
+    append_tags = False
+    data_file = "/checkpoint/wangalexc/fairseq/08-11-2019/qst.src-subset.cnndm.test.txt"
+    data = parse_generation(data_file)
+
+    for txt_type in ["src", "gen", "trg"]:
+        txts = [d[txt_type] for d in data.values() if len(d['gen']) > 0]
+        if append_tags:
+            if txt_type in ["src", "trg"]:
+                txts = [f"<t> {txt} </t>" for txt in txts]
+            else:
+                txts = [[f"<t> {hyp[0]} </t>"] for hyps in txts for hyp in hyps]
+
+        if txt_type == "gen":
+            txts = [t[0] for t in txts]
+
+        out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
+        write_txt(txts, out_file)
+        print(f"Wrote {len(txts)} texts to {out_file}")
+
+
+def filter_qsts(qsts, n_qsts,
+                prbs=None, reverse_prob=False,
+                exp_anss=None, act_anss=None):
+    """ Filter out questions by a number of criteria
+    - repetitions: exact repetitions
+    - length: short sentences are excluded
+
+    If anss is nonempty, then this function expects that
+        len(qsts) % len(ans) == 0 and that the questions
+        are grouped by the answer.
+
+    args:
+        - qsts: questions
+        - n_qsts: number of questions
+        - prbs: probability of each question (optional, but not really)
+        - reverse_prob: if True, sort by reverse probability
+        - exp_anss: expected answers, e.g. that we conditioned on (optional)
+        - act_anss: actual answers, e.g. from a QA model
+
+    """
+
+    qsts_and_prbs = zip(qsts, prbs)
+    if act_anss is not None:
+        qsts_and_prbs = [(q, p) for q, p , a in zip(qsts, prbs, act_anss) if a]
+        n_qsts_w_ans = len(qsts_and_prbs)
+    else:
+        n_qsts_w_ans = None
+
+    if act_anss is not None and exp_anss is not None:
+        qsts_and_prbs = [(q, p) for q, p, a, e in zip(qsts, prbs, act_anss, exp_anss) if a == e]
+        n_qsts_w_match_ans = len(qsts_and_prbs)
+    else:
+        n_qsts_w_match_ans = None
+    qsts_and_prbs = sorted(qsts_and_prbs, key=lambda x: x[1], reverse=not reverse_prob)
+    clean_qsts = list()
+    clean_prbs = list()
+    for qst, prob in qsts_and_prbs:
+        try:
+            qst_idx = qst.index('?') # get idx of *first* '?'
+            # filter out stuff after '?'
+            clean_qst = qst[:qst_idx + 1]
+            clean_toks = clean_qst.split()
+            if clean_qst in clean_qsts or len(clean_toks) < 3:
+                continue
+            clean_qsts.append(clean_qst)
+            clean_prbs.append(prob)
+        except ValueError as e: # no '?' mark
+            continue
+
+    n_clean_qsts = len(clean_qsts)
+    if n_clean_qsts < n_qsts:
+        #print("Too few questions!")
+        supp_qsts = random.sample(qsts, n_qsts - n_clean_qsts)
+        clean_qsts += supp_qsts
+
+    ret = {
+           'qsts': clean_qsts[:n_qsts],
+           'n_qsts_w_match_ans': n_qsts_w_match_ans,
+           'n_qsts_w_ans': n_qsts_w_ans,
+           'n_clean_qsts': n_clean_qsts,
+          }
+    return ret
+
+
 def main(arguments):
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--command", choices=["extract_ans", "filter_qsts"], description="Function to perform")
+    parser.add_argument("--command", choices=["extract_ans", "extract_gen", "filter_qsts"], description="Function to perform")
     parser.add_argument("--data_file", type=str, description="File from which to extract answers or filter questions. For `extract_ans`, this should be a text file with an example per line.")
     parser.add_argument("--out_dir", type=str, description="Directory to write outputs")
     parser.add_argument("--out_prefix", type=str, default="test", description="Prefix for files written out")
@@ -211,8 +299,9 @@ def main(arguments):
     if args.command == "extract_ans":
         prepare_ans_conditional_data(args.data_file, args.out_dir, args.out_prefix,
                                      n_ans_per_txt=args.n_ans)
-    elif args.command == "filter_qsts":
-        filter_qsts()
+    elif args.command == "extract_gen":
+        raise NotImplementedError
+        #extract_gen_from_fseq_log()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
