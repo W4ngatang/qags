@@ -19,13 +19,20 @@ To compute QAGS scores, we need to
 #### Extracting answer candidates
 
 We use an answer-conditional question generation model, so we first need to extract answer candidates.
+Use the following command, where `data_file` is a text file containining an example per line and
+`out_dir` is the directory to write the processed files to.
+The script will produce `test.txt`, `test_{n_ans_per_txt}.txt`, `test_w_{n_ans_per_txt}ans.txt` 
+in `out_dir`, which respectively contain the examples, the extracted answers, and the answers and examples formatted to
+feed into the QG model.
 
-```python qg_utils.py --command extract_ans --data_dir ${DATA_DIR}```
+```python qg_utils.py --command extract_ans --data_file ${data_file} --out_dir ${out_dir}```
+
 
 #### Generating questions
 
-To actually generate the questions, we rely on BART finetuned on NewsQA, implemented in fairseq.
-Code, model, and instructions for doing so are available [here](https://github.com/W4ngatang/qags/fairseq).
+To generate the questions, we rely on [BART](https://arxiv.org/abs/1910.13461) finetuned on [NewsQA](https://arxiv.org/abs/1611.09830), implemented in [`fairseq`](https://github.com/pytorch/fairseq).
+A frozen version of `fairseq` for doing so is available in [`qags/fairseq`](https://github.com/W4ngatang/qags/fairseq).
+Our pretrained QG model is available [here](TODO).
 
 To generate from these models, we must first preprocess the data (tokenize and binarize) using the following command:
 ```./scripts/aw/preprocess.sh preprocess```
@@ -99,7 +106,7 @@ For XSUM, the summarization model is BART ([Lewis et al., 2020](https://arxiv.or
 If you use this code or data, please cite us.
 
 ```
-@article{Wang_2020,
+@article{wang2020asking,
    title={Asking and Answering Questions to Evaluate the Factual Consistency of Summaries},
    url={http://dx.doi.org/10.18653/v1/2020.acl-main.450},
    DOI={10.18653/v1/2020.acl-main.450},

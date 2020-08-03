@@ -201,7 +201,7 @@ def main(arguments):
     parser.add_argument("--command", choices=["extract_ans", "filter_qsts"], description="Function to perform")
     parser.add_argument("--data_file", type=str, description="File from which to extract answers or filter questions. For `extract_ans`, this should be a text file with an example per line.")
     parser.add_argument("--out_dir", type=str, description="Directory to write outputs")
-    parser.add_argument("--out_prefix", type=str, description="Prefix for files written out")
+    parser.add_argument("--out_prefix", type=str, default="test", description="Prefix for files written out")
 
     # answer extraction options
     parser.add_argument("--n_ans", type=int, default=10, description="Number of answer candidates per example")
