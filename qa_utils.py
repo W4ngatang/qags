@@ -365,7 +365,8 @@ def get_qags_scores(src_ans_file, trg_ans_file,
 
 def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answer outputs from pytorch_pretrained_bert models')
-    parser.add_argument("--command", choices=["compute-qags"], description="Function to perform")
+    parser.add_argument("--command", "-c", choices=["compute-qags", "format-qa-data"],
+                        description="Function to perform")
     parser.add_argument('--source-ans-file', type=str)
     parser.add_argument('--target-ans-file', type=str)
     parser.add_argument('--n-qsts-per-doc', type=int, default=5)
@@ -375,7 +376,7 @@ def main(arguments):
     args = parser.parse_args()
 
 
-    if args.command == "format-data":
+    if args.command == "format-qa-data":
         CKPT_DIR="/misc/vlgscratch4/BowmanGroup/awang/ckpts"
         dataset="cnndm-random1000-10ans"
         gen_mdl="bus"
