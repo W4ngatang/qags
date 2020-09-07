@@ -32,7 +32,7 @@ feed into the QG model.
 
 To generate the questions, we rely on [BART](https://arxiv.org/abs/1910.13461) finetuned on [NewsQA](https://arxiv.org/abs/1611.09830), implemented in [`fairseq`](https://github.com/pytorch/fairseq).
 A frozen version of `fairseq` for doing so is available in [`qags/fairseq`](https://github.com/W4ngatang/qags/fairseq).
-Our pretrained QG model is available [here](TODO).
+Our pretrained QG model is available [here](https://drive.google.com/drive/folders/1GP75Jp1XuPnfidhMtc1ey_-zjFKDxUoh?usp=sharing).
 
 To generate from these models, we must first preprocess the data (tokenize and binarize) using the command:
 `./fairseq/scripts/aw/preprocess.sh preprocess`.
@@ -63,7 +63,7 @@ Once you have answers for each question, we need to compare the expected and pre
 which we do so by TODO(Alex): instructions for using answer filtering once computed.
 
 To evaluate our QA models, use the following command to evaluate the model on `pred_file` and write the predictions to `out_dir/out_file`
-Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](TODO).
+Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](https://drive.google.com/drive/folders/1GP75Jp1XuPnfidhMtc1ey_-zjFKDxUoh?usp=sharing).
 Make sure `model_dir` points to the QA model directory.
 To compute QAGS scores, evaluate the QA model using the both the article as context and the summary as context, so you will need to run this command twice.
 
@@ -105,7 +105,7 @@ Each annotation is a binary choice of whether or not the summary sentence is fac
 as well as an anonymized annotator ID.
 
 For CNNDM, the summarization model is Bottom-Up Summarization ([Gehrmann et al., 2017](https://arxiv.org/abs/1808.10792)).
-For XSUM, the summarization model is BART ([Lewis et al., 2020](https://arxiv.org/abs/1910.13461)) finetuned on the XSUM training data.
+For XSUM, the summarization model is BART finetuned on the XSUM training data.
 
 ```data_stuff.py:compute_correlations_with_human```
 
