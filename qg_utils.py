@@ -172,7 +172,7 @@ def prepare_ans_conditional_data(data_file,
     print(f"\tWrote {len(txts_w_ans)} sentences to {txt_w_ans_file}")
 
 
-def extract_gen_from_fseq_log(data_file):
+def extract_gen_from_fseq_log(data_file, out_dir):
     """ """
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
     from fseq logs and write each as a text file, one text per line.
@@ -193,7 +193,8 @@ def extract_gen_from_fseq_log(data_file):
         if txt_type == "gen":
             txts = [t[0] for t in txts]
 
-        out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
+        #out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
+        out_file = f"{out_dir}/{txt_type}.txt"
         write_txt(txts, out_file)
         print(f"Wrote {len(txts)} texts to {out_file}")
 
