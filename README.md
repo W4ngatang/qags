@@ -1,7 +1,6 @@
-# qags
-Question Answering and Generation for Summarization
+# qags: Question Answering and Generation for Summarization
 
-This is the code for the paper [Asking and Answering Questions to Evaluate the Factual Consistency of Summaries](https://arxiv.org/abs/2004.04228), which appeared at ACL 2020.
+This repo contains the code for the paper [Asking and Answering Questions to Evaluate the Factual Consistency of Summaries](https://arxiv.org/abs/2004.04228), which appeared at ACL 2020.
 
 
 ## Usage
@@ -107,7 +106,6 @@ as well as an anonymized annotator ID.
 For CNNDM, the summarization model is Bottom-Up Summarization ([Gehrmann et al., 2017](https://arxiv.org/abs/1808.10792)).
 For XSUM, the summarization model is BART finetuned on the XSUM training data.
 
-```data_stuff.py:compute_correlations_with_human```
 
 
 ## Citation

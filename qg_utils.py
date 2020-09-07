@@ -109,33 +109,9 @@ def prepare_ans_conditional_data(data_file,
                                  ):
     """ Given a text file, extract possible answer candidates for each line.
 
-    Will generate CONST instances for each line in txt
-
-    For posteriority, old paths:
-    txt_fld = "bart"
-
-    # Falke
-    split = "correct"
-    data_file = f"{DATA_DIR}/falke-correctness/sent_reranking/test.{split}.txt"
-    out_dir = f"{DATA_DIR}/falke-correctness/sent_reranking/{split}2src-{n_ans_per_txt}ans"
-    txt_w_ans_file = f"{out_dir}/test.{split}_w_ans.txt"
-    txt_file = f"{out_dir}/test.{split}.txt"
-    ans_file = f"{out_dir}/test.{split}_ans.txt"
-
-    # XSUM
-    data_file = f"{DATA_DIR}/xsum/random1000/xsum.test.{txt_fld}.10251125.random1000.txt"
-    out_dir = f"{DATA_DIR}/xsum/random1000-{n_ans_per_txt}ans"
-    txt_w_ans_file = f"{out_dir}/xsum.test.{txt_fld}_w_{n_ans_per_txt}ans.random1000.txt"
-    txt_file = f"{out_dir}/xsum.test.{txt_fld}.txt"
-    ans_file = f"{out_dir}/xsum.test.{txt_fld}_{n_ans_per_txt}ans.random1000.txt"
-
-    # CNN/DM
-    data_file = f"{DATA_DIR}/cnndailymail/fseq/subset1000/subset1000.{txt_fld}.random.ref_order.txt"
-    out_dir = f"{DATA_DIR}/cnndailymail/fseq/random1000-{n_ans_per_txt}ans"
-    txt_w_ans_file = f"{out_dir}/cnndm.test.{txt_fld}_w_{n_ans_per_txt}ans.random1000.txt"
-    txt_file = f"{out_dir}/cnndm.test.{txt_fld}.random1000.txt"
-    ans_file = f"{out_dir}/cnndm.test.{txt_fld}_{n_ans_per_txt}ans.random1000.txt"
+    Will generate n_ans_per_text instances for each line in txt
     """
+
 
     txt_w_ans_file = f"{out_dir}/{out_prefix}_w_{n_ans_per_txt}ans.txt"
     txt_file = f"{out_dir}/{out_prefix}.txt"
@@ -196,12 +172,14 @@ def prepare_ans_conditional_data(data_file,
     print(f"\tWrote {len(txts_w_ans)} sentences to {txt_w_ans_file}")
 
 
-def extract_src_trg_gen_from_fseq_log():
+def extract_gen_from_fseq_log(data_file):
+    """ """
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
-    from fseq logs and write each as a text file, one text per line. """
+    from fseq logs and write each as a text file, one text per line.
+    """
+    data_file = "/checkpoint/wangalexc/fairseq/08-11-2019/qst.src-subset.cnndm.test.txt"
 
     append_tags = False
-    data_file = "/checkpoint/wangalexc/fairseq/08-11-2019/qst.src-subset.cnndm.test.txt"
     data = parse_generation(data_file)
 
     for txt_type in ["src", "gen", "trg"]:
@@ -300,8 +278,7 @@ def main(arguments):
         prepare_ans_conditional_data(args.data_file, args.out_dir, args.out_prefix,
                                      n_ans_per_txt=args.n_ans)
     elif args.command == "extract_gen":
-        raise NotImplementedError
-        #extract_gen_from_fseq_log()
+        extract_gen_from_fseq_log()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
