@@ -374,104 +374,29 @@ def main(arguments):
     parser.add_argument('--correctness-file', type=str, default=None)
     args = parser.parse_args()
 
-    # Parameters
-    data = 'wikinews'
-    gen_mdl = 'bart'
-    subset = '120519' # NOTE(Alex): IF IT'S 250, IT SHOULD BE 6250!
-    n_exs = 100
-    if data == "cnndm":
-        data_dir = f"{DATA_DIR}/cnndailymail/fseq"
-    elif data == "xsum":
-        data_dir = f"{DATA_DIR}/xsum"
-    elif data == "falke-sent-rerank":
-        data_dir = f"{DATA_DIR}/falke-correctness/sent-rerank"
-    elif data == "wikinews":
-        data_dir = f"{DATA_DIR}/wikinews"
-
-    dataset = f'{data}-{subset}'
-    qg_model = 'qg-newsqa-ans'
-    bert_version = 'bert-large-uncased'
-    n_qsts = 20 # n questions we actually want to use
-    n_gen_qsts = 10 # n questions generated per doc
-    n_ans = 10 # n answer candidates
-    use_all_qsts = False # use all qsts, mostly if we want answers to our questions
-    use_act_anss = True # use actual answer (filter if actual answer is empty)
-    use_exp_anss = False # use expected answer (filter if actual answer doesn't match)
-    beam = 10
-    topk = 0
-    topp = 0
-    diverse = 0
-    reverse_prob = False
-    #dec_method = 'nhyps25.beam25.diverse25'
-    dec_method = 'nhyps10.beam10.diverse10'
-    #dec_method = ''
-
-    # Some sanity checks
-    if use_all_qsts:
-        assert n_qsts == n_gen_qsts, f"Only using {n_qsts} of {n_gen_qsts} questions!"
-
-    # Original texts
-    if n_ans > 0:
-        dataset = f'{dataset}-{n_ans}ans'
-        data_subdir = f'{subset}-{n_ans}ans-{dec_method}' if dec_method else f'{subset}-{n_ans}ans'
-        src_txt_file = f"{data_dir}/{data_subdir}/test.src.txt"
-        src_w_trg_txt_file = f"{data_dir}/{data_subdir}/test.src_w_trg.txt" if data in ["xsum", "wikinews"] else None
-        gen_txt_file = f"{data_dir}/{data_subdir}/test.{gen_mdl}.txt"
-        src_ans_file = f"{data_dir}/{data_subdir}/test.src_ans.txt"
-        gen_ans_file = f"{data_dir}/{data_subdir}/test.{gen_mdl}_w_ans.txt"
-    else:
-        # NOTE(Alex): these aren't abstracted / generalized
-        src_txt_file = f"{data_dir}/{subset}/src2bart/raw/test.src"
-        gen_txt_file = f"{data_dir}/{subset}/bart2src/raw/test.src"
-
-    dataset = f'{dataset}-{dec_method}' if dec_method else dataset
-
-    # Files containing all generated questions
-    if use_all_qsts:
-        qst_prefix = "qstall"
-    elif use_exp_anss:
-        qst_prefix = f"qst_w_match{n_qsts}{bert_version}"
-    elif use_act_anss:
-        qst_prefix = f"qst_w_ans{n_qsts}{bert_version}"
-    else:
-        qst_prefix = f"qst{n_qsts}"
-
-    if topk > 0:
-        dec_opt = f'topk{topk}'
-    elif topp > 0:
-        dec_opt = f'topp{topp}'
-    elif diverse:
-        dec_opt = f'beam{beam}.diverse{diverse}'
-    else:
-        dec_opt = f'beam{beam}'
-    src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
-    gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
-    src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
-    gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
-    dec_opt = f'{dec_opt}'
-    src_prd_file = f""
-    gen_prd_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-{dec_opt}.{dataset}-gen.json"
-
-    files = {
-             "src": {"txt": src_txt_file, "qst": src_qst_file, "prb": src_prob_file, "prd": src_prd_file},
-             "gen": {"txt": gen_txt_file, "qst": gen_qst_file, "prb": gen_prob_file, "prd": gen_prd_file},
-            }
-
-    out_dir = f"{PROJ_DIR}/data/{data}/{subset}"
-    if n_ans > 0:
-        out_dir = f"{out_dir}-{n_ans}ans"
-        n_gen_qsts *= n_ans
-        files["src"]["ans"] = src_ans_file
-        files["gen"]["ans"] = gen_ans_file
-    out_dir = f"{out_dir}-{dec_method}" if dec_method else out_dir
-    out_dir = f"{out_dir}-reverse" if reverse_prob else out_dir
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
-    print(f"Reading data from {src_qst_file} and {gen_qst_file}, saving to {out_dir}")
-
 
     if args.command == "format-data":
-        aggregate_questions_from_txt()
+        CKPT_DIR="/misc/vlgscratch4/BowmanGroup/awang/ckpts"
+        dataset="cnndm-random1000-10ans"
+        gen_mdl="bus"
+        qg_model="qg-newsqa-ans-ckpt10"
+        n_gen_qsts=10
+        dec_opt="beam10.diverse10.w_hack"
+        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
+        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
+        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
+        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
+        dec_opt = f'{dec_opt}'
+        src_prd_file = f""
+        gen_prd_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-{dec_opt}.{dataset}-gen.json"
+
+        files = {
+                 "src": {"txt": src_txt_file, "qst": src_qst_file, "prb": src_prob_file, "prd": src_prd_file},
+                 "gen": {"txt": gen_txt_file, "qst": gen_qst_file, "prb": gen_prob_file, "prd": gen_prd_file},
+                }
+
+
+        aggregate_questions_from_txt(files, out_dir)
     elif args.command == "compute-qags":
         qags_scores = get_qags_scores(args.src_ans_file, args.trg_ans_file, args.ans_similarity_fn)
         with open(os.path.join(args.out_dir, "qags_scores.txt", "w") as out_fh:
