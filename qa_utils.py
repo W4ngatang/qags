@@ -7,8 +7,8 @@ import string
 import random
 import argparse
 import editdistance
+from tqdm import tqdm
 from collections import Counter
-import ipdb
 
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
@@ -16,6 +16,8 @@ from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
                   filter_line_fseq, parse_generation, \
                   load_txt, load_json
+
+import ipdb
 
 
 def normalize_answer(s):
@@ -107,13 +109,6 @@ def count_noans(src_anss, trg_anss):
     return percent_src_noans, percent_trg_noans, both_unans
 
 
-def load_correctness(data_file):
-    """ Load file with correctness labels per summary
-    Currently very ad hoc """
-
-    return list(map(lambda x: float(x.strip()), open(data_file).readlines()))
-
-
 def aggregate_examples(scores, n_qsts_per_doc=5):
     """Jank way to aggregate questions across examples.
     Right now (7/18/19), questions by examples are grouped together.
@@ -193,54 +188,96 @@ def filter_qsts(qsts, n_qsts,
     return ret
 
 
-def aggregate_questions_from_txt(files, out_dir):
+def aggregate_questions_from_txt(out_dir,
+                                 src_txt_file,
+                                 gen_txt_file,
+                                 gen_qst_file,
+                                 gen_prob_file=None,
+                                 gen_ans_file=None,
+                                 gen_prd_file=None,
+                                 src_w_trg_txt_file=None,
+                                 use_all_qsts=False, use_act_anss=False, use_exp_anss=False,
+                                 n_gen_qsts=10, n_ans=10, n_qsts=20):
     """ Extract questions generated from src, trg, and gen
     with the corresponding field from fseq logs (one log/txt) and write to jsonl.
     Each fseq log should have the txt field as 'source' (S)
-    and the questions as generated 'hypotheses' (H) """
+    and the questions as generated 'hypotheses' (H)
 
+    args:
+        - src_txt_file: txt file or source inputs (e.g. articles for summarization)
+            - src_w_trg_txt_file (optional): special src inputs with the trg re-appended for XSUM
+        - gen_txt_file: txt file of model-generated targets (e.g. summaries for summarization)
+        - gen_qst_file: txt file of questions generated conditioned on src/gen
+        - gen_prob_file: txt file of {src/gen} question probabilities according to QG model
+        - gen_prd_file (optional): txt file of answers predicted by QA model on src/gen_qst_file
 
+        n_ans: the number of answer candidates per text
+        n_gen_qsts: the number of questions generated per (text, answer) pair
+        n_qsts: the number of questions to use for each example
+        use_all_qsts:
+        use_act_anss:
+        use_exp_anss:
+    """
+
+    assert not (use_exp_anss and (gen_ans_file is None)), "Trying to use expected answers, but not provided any!"
+    assert not (use_act_anss and (gen_ans_file is None)), "Trying to use predicted answers, but not provided expected answers!"
+    assert not (use_act_anss and (gen_prd_file is None)), "Trying to use predicted answers, but not provided any!"
+
+    files = {
+             "src": {"txt": src_txt_file},
+             "gen": {"txt": gen_txt_file, "qst": gen_qst_file, "prb": gen_prob_file, "ans": gen_ans_file, "prd": gen_prd_file},
+            }
+
+    # the number of original examples (not counting answer candidates)
+    n_exs = None
+    # number of total generated questions per example (across answer candidates and generated questions)
+    n_qsts_per_ex = n_ans * n_gen_qsts
+
+    # load all data
     all_txts, all_qsts = {}, {}
     for txt_fld, field_files in files.items():
         txts = load_txt(field_files["txt"])
         all_txts[txt_fld] = txts
-
         if txt_fld == "src" and src_w_trg_txt_file is not None:
             txts = load_txt(src_w_trg_txt_file)
             all_txts["src_w_trg"] = txts
 
+        if n_exs is None: # infer number of examples
+            n_exs = len(txts)
+        else:
+            assert len(txts) == n_exs, "Different numbers of txts detected! Expected {n_exs} but found {len(txts)} for {txt_fld}."
+
+        # load questions, probabilities, (expected) answers only based on generation
         if txt_fld != "gen":
             continue
         qsts = load_txt(field_files["qst"])
-        prbs = [float(f) for f in load_txt(field_files["prb"])]
-        anss = load_txt(field_files["ans"]) if ("ans" in field_files and use_exp_anss) else list()
-        if "prd" in field_files and use_act_anss:
+        prbs = [float(f) for f in load_txt(field_files["prb"])] #if field_files["prb"] is not None else list()
+        anss = load_txt(field_files["ans"]) if use_exp_anss else []
+        # optionally load QA model predictions
+        if use_act_anss:
             raw_prds = json.load(open(field_files["prd"]))
             prds = [raw_prds[str(i)] for i in range(len(raw_prds))]
         else:
             prds = list()
         all_qsts[txt_fld] = (qsts, prbs, anss, prds)
+    print(f"Formatting QA data for {n_exs} examples, filtering {n_qsts_per_ex} questions per example to {n_qsts}")
 
-    # for each (question from a source x txt source) pair,
     # build the data then write out a SQuAD format file
-    bookkeep = {k: {'idxs': list(), 'min': n_gen_qsts, 'n_below': 0, 'counts': list()} for k in \
-                 ['n_clean_qsts', 'n_qsts_w_ans', 'n_qsts_w_match_ans']}
+    # dummy iterator in case we want to condition questions on something else outside of gen
     for qst_src in all_qsts:
-        if qst_src != "gen":
-            continue
-
         qsts, prbs, anss, prds = all_qsts[qst_src]
-        all_clean_qsts = list()
+        all_clean_qsts = []
 
         # Filter questions
+        # Extract questions assuming there's a constant number per example and in order
         for i in tqdm(range(n_exs), desc="Filtering questions"):
-            cand_qsts = qsts[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
-            cand_prbs = prbs[(i * n_gen_qsts): ((i + 1) * n_gen_qsts)]
+            cand_qsts = qsts[(i * n_qsts_per_ex): ((i + 1) * n_qsts_per_ex)]
+            cand_prbs = prbs[(i * n_qsts_per_ex): ((i + 1) * n_qsts_per_ex)]
             cand_anss = anss[(i * n_ans): ((i + 1) * n_ans)] if anss else None
-            cand_prds = prds[(i *n_gen_qsts): ((i + 1) * n_gen_qsts)] if prds else None
+            cand_prds = prds[(i * n_qsts_per_ex): ((i + 1) * n_qsts_per_ex)] if prds else None
             if not use_all_qsts:
                 ret = filter_qsts(cand_qsts, n_qsts,
-                                  prbs=cand_prbs, reverse_prob=reverse_prob,
+                                  prbs=cand_prbs, reverse_prob=False,
                                   exp_anss=cand_anss, act_anss=cand_prds)
             else:
                 ret = {
@@ -254,52 +291,31 @@ def aggregate_questions_from_txt(files, out_dir):
                 assert not isinstance(qst, list), "List instead of string detected!"
             all_clean_qsts.append(clean_qsts)
 
-            # Bookkeeping for questions
-            for k, v in ret.items():
-                if not isinstance(v, int):
-                    continue
-                if v < bookkeep[k]['min']:
-                    bookkeep[k]['min'] = v
-                    bookkeep[k]['idxs'] = [i]
-                elif v == bookkeep[k]['min']:
-                    bookkeep[k]['idxs'].append(i)
-                if v < n_qsts:
-                    bookkeep[k]['n_below'] += 1
-                bookkeep[k]['counts'].append(v)
-
-        # Construct data in SQuAD-like format
+        # Construct data in SQuAD-like format, using both src (article) and gen (model generation) as context
         for txt_fld in all_txts:
             if use_all_qsts and txt_fld != "gen":
                 # case where we want to get answers for all our questions
-                # and we want to just use the generations to do that,
-                # assuming we generated from generations
+                # and we want to just use the generations to do that, assuming we generated from generations
                 continue
-
             txts = all_txts[txt_fld]
-
             raw_data = {}
+
             for i in tqdm(range(n_exs), desc="Formatting data"):
-                txt = txts[i * n_ans].split()
+                if len(txts) == len(qsts):
+                    txt = txts[i * n_ans].split()
+                elif len(txts) < len(qsts):
+                    assert len(qsts) / len(txts) == n_qsts_per_ex, \
+                            f"Expected constant number of questions ({n_qsts_per_ex}) per example! Found {len(qsts)} total questions for {len(txts)} examples"
+                    txt = txts[i].split()
+                else:
+                    raise IndexError("Number of questions should be weakly greater than number of examples!")
                 clean_qsts = all_clean_qsts[i]
                 raw_data[i] = {txt_fld: txt, "hypotheses": clean_qsts}
 
             data = format_squad(raw_data, context=txt_fld, ctx_split=True)
-
-            out_file = f"{out_dir}/{qst_prefix}-{qst_src}-{qg_model}-{dec_opt}.{dataset}-{txt_fld}.json"
+            out_file = f"{out_dir}/{txt_fld}.json"
             print(f"Writing to {out_file}")
             json.dump(data, open(out_file, "w", encoding="utf-8"))
-
-    for k, v in bookkeep.items():
-        if not v['counts']:
-            continue
-        counts = np.array(v['counts'])
-        print(f"{k}: ")
-        print(f"\t{len(v['idxs'])} exs with min {v['min']} (idxs: {list(set(v['idxs']))})")
-        print(f"\t{v['n_below']} exs w/ fewer than {n_qsts} clean questions!")
-        print(f"\tmean: {np.mean(counts)}")
-        print(f"\tmedian: {np.median(counts)}")
-        print(f"\tmax: {np.max(counts)}")
-        print(f"\tmin: {np.min(counts)}")
 
 
 def evaluate(tgts, prds, n_qsts_per_doc, metric_name="em"):
@@ -365,42 +381,54 @@ def get_qags_scores(src_ans_file, trg_ans_file,
 
 def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answer outputs from pytorch_pretrained_bert models')
-    parser.add_argument("--command", "-c", choices=["compute-qags", "format-qa-data"],
-                        description="Function to perform")
+    parser.add_argument("-c", "--command", choices=["compute-qags", "format-qa-data"])
+    parser.add_argument('--data-dir', type=str, default=None)
+    parser.add_argument('--out-dir', type=str, default=None)
+
+    parser.add_argument('--src-txt-file', type=str,
+                        help="Txt file containing a src example per line, corresponding with gen_txt_file")
+    parser.add_argument('--src-w-trg-txt-file', type=str, default=None, help="special input for XSUM")
+    parser.add_argument('--gen-txt-file', type=str,
+                        help="Txt file containing a model-generated example per line, corresponding with src_txt_file")
+    parser.add_argument('--gen-qst-file', type=str,
+                        help="Txt file containing a gen-conditioned question per line, in the same order as {src/gen}_txt_file")
+    parser.add_argument('--gen-prob-file', type=str, default=None,
+                        help="Txt file containing probabilities of each question in gen_qst_file according to the QG model")
+    parser.add_argument('--gen-ans-file', type=str, default=None,
+                        help="Txt file containing expected answers of each question in gen_qst_file")
+    parser.add_argument('--gen-prd-file', type=str, default=None,
+                        help="Txt file containing predictions of QA model on questions in gen_qst_file")
+    parser.add_argument('--n-ans-per-doc', type=int, default=10, help="Number of answer candidates per example")
+    parser.add_argument('--n-gen-qsts', type=int, default=10, \
+            help="Number of generated questions per (example, answer candidate) pair")
+    parser.add_argument('--n-qsts-per-doc', type=int, default=5, \
+            help="Number of questions to use per example, filtered down from n_ans_per_doc * n_gen_qsts")
+    parser.add_argument('--use-all-qsts', action='store_true')
+    parser.add_argument('--use-act-anss', action='store_true')
+    parser.add_argument('--use-exp-anss', action='store_true')
+
     parser.add_argument('--source-ans-file', type=str)
     parser.add_argument('--target-ans-file', type=str)
-    parser.add_argument('--n-qsts-per-doc', type=int, default=5)
     parser.add_argument('--ans-similarity-fn', choices=["em", "f1"], default="f1")
-    parser.add_argument('--out-dir', type=str, default=None)
-    parser.add_argument('--correctness-file', type=str, default=None)
     args = parser.parse_args()
 
 
     if args.command == "format-qa-data":
-        CKPT_DIR="/misc/vlgscratch4/BowmanGroup/awang/ckpts"
-        dataset="cnndm-random1000-10ans"
-        gen_mdl="bus"
-        qg_model="qg-newsqa-ans-ckpt10"
-        n_gen_qsts=10
-        dec_opt="beam10.diverse10.w_hack"
-        src_qst_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
-        gen_qst_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.txt"
-        src_prob_file = f"{CKPT_DIR}/bart/{dataset}/src2{gen_mdl}/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
-        gen_prob_file = f"{CKPT_DIR}/bart/{dataset}/{gen_mdl}2src/{qg_model}/gens.nhyps{n_gen_qsts}.lenpen1.0.{dec_opt}.prob"
-        dec_opt = f'{dec_opt}'
-        src_prd_file = f""
-        gen_prd_file = f"{CKPT_DIR}/ppb/{bert_version}/squad_v2_0/06-25-2019-v2_0/{dataset}/bart/prd.qstall-gen-{qg_model}-{dec_opt}.{dataset}-gen.json"
+        aggregate_questions_from_txt(args.out_dir,
+                                     args.src_txt_file,
+                                     args.gen_txt_file,
+                                     args.gen_qst_file,
+                                     args.src_w_trg_txt_file,
+                                     args.gen_prob_file,
+                                     args.gen_ans_file,
+                                     args.gen_prd_file,
+                                     n_ans=args.n_ans_per_doc, n_gen_qsts=args.n_gen_qsts, n_qsts=args.n_qsts_per_doc,
+                                     use_all_qsts=args.use_all_qsts, use_act_anss=args.use_act_anss, use_exp_anss=args.use_exp_anss,
+                                    )
 
-        files = {
-                 "src": {"txt": src_txt_file, "qst": src_qst_file, "prb": src_prob_file, "prd": src_prd_file},
-                 "gen": {"txt": gen_txt_file, "qst": gen_qst_file, "prb": gen_prob_file, "prd": gen_prd_file},
-                }
-
-
-        aggregate_questions_from_txt(files, out_dir)
     elif args.command == "compute-qags":
         qags_scores = get_qags_scores(args.src_ans_file, args.trg_ans_file, args.ans_similarity_fn)
-        with open(os.path.join(args.out_dir, "qags_scores.txt", "w") as out_fh:
+        with open(os.path.join(args.out_dir, "qags_scores.txt", "w")) as out_fh:
             for score in qags_scores:
                 out_fh.write(f"{score}\n")
 
