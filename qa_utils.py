@@ -141,13 +141,12 @@ def filter_qsts(qsts, n_qsts,
         - prbs: probability of each question (optional, but not really)
         - reverse_prob: if True, sort by reverse probability
         - exp_anss: expected answers, e.g. that we conditioned on (optional)
-        - act_anss: actual answers, e.g. from a QA model
-
+        - act_anss: actual answers, e.g. from a QA model (optional)
     """
 
     qsts_and_prbs = zip(qsts, prbs)
     if act_anss is not None:
-        qsts_and_prbs = [(q, p) for q, p , a in zip(qsts, prbs, act_anss) if a]
+        qsts_and_prbs = [(q, p) for q, p, a in zip(qsts, prbs, act_anss) if a]
         n_qsts_w_ans = len(qsts_and_prbs)
     else:
         n_qsts_w_ans = None
@@ -214,9 +213,9 @@ def aggregate_questions_from_txt(out_dir,
         n_ans: the number of answer candidates per text
         n_gen_qsts: the number of questions generated per (text, answer) pair
         n_qsts: the number of questions to use for each example
-        use_all_qsts:
-        use_act_anss:
-        use_exp_anss:
+        use_all_qsts: use all questions
+        use_act_anss: filter out [NO_ANS] questions
+        use_exp_anss: filter out questions where prediction doesn't match expected answer
     """
 
     assert not (use_exp_anss and (gen_ans_file is None)), "Trying to use expected answers, but not provided any!"

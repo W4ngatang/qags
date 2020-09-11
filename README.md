@@ -50,16 +50,24 @@ Finally, extract the generated questions using `python qg_utils.py --command ext
 
 ### 2. Answering Questions
 
-To prepare the QA data, use `python qa_utils.py --command format-data`. (TODO(Alex))
+To prepare the QA data, use the following command: 
+
+```
+python qa_utils.py --command format-qa-data --out-dir tmp \
+                   --src-txt-file ${src_txt_file} --gen-txt-file ${gen_txt_file} \
+                   --src-qst-file ${src_qst_file} --gen-qst-file ${gen_qst_file} \
+                   --src-prob-file ${src_prob_file} --gen-prob-file ${gen_prob_file} 
+```
 
 As part of this step, we filter questions by quality using a number of heuristics.
 Most importantly, we filter questions by enforcing answer consistency: 
 We use a QA model to answer the generated questions, and if the predicted answer doesn't match the original answer, we throw out the question.
 To do this, we need to run the QA model on the generated questions, which will produce an answer file.
-For this step, use the flag `--use_all_qsts` and then run the QA model on the resulting data file.
+For this step, use the flag `--use-all-qsts` and then run the QA model on the resulting data file.
 
 Once you have answers for each question, we need to compare the expected and predicted answers, 
-which we do so by TODO(Alex): instructions for using answer filtering once computed.
+which we do so  via the flags `--use-exp-anss --gen-ans-file ${gen_ans_file} --gen-prd-file ${gen_prd_file}`,
+where the latter two respectively contain the expected and the predicted answers.
 
 To evaluate our QA models, use the following command to evaluate the model on `pred_file` and write the predictions to `out_dir/out_file`
 Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](https://drive.google.com/drive/folders/1GP75Jp1XuPnfidhMtc1ey_-zjFKDxUoh?usp=sharing).
