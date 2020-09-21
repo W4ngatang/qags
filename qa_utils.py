@@ -11,13 +11,10 @@ from tqdm import tqdm
 from collections import Counter
 
 import numpy as np
-from scipy.stats import pearsonr, spearmanr
 from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
                   filter_line_fseq, parse_generation, \
                   load_txt, load_json
-
-import ipdb
 
 
 def normalize_answer(s):
@@ -381,34 +378,34 @@ def get_qags_scores(src_ans_file, trg_ans_file,
 def main(arguments):
     parser = argparse.ArgumentParser(description='Evaluate answer outputs from pytorch_pretrained_bert models')
     parser.add_argument("-c", "--command", choices=["compute-qags", "format-qa-data"])
-    parser.add_argument('--data-dir', type=str, default=None)
-    parser.add_argument('--out-dir', type=str, default=None)
+    parser.add_argument('--data_dir', type=str, default=None)
+    parser.add_argument('--out_dir', type=str, default=None)
 
-    parser.add_argument('--src-txt-file', type=str,
+    parser.add_argument('--src_txt_file', type=str,
                         help="Txt file containing a src example per line, corresponding with gen_txt_file")
-    parser.add_argument('--src-w-trg-txt-file', type=str, default=None, help="special input for XSUM")
-    parser.add_argument('--gen-txt-file', type=str,
+    parser.add_argument('--src_w_trg_txt_file', type=str, default=None, help="special input for XSUM")
+    parser.add_argument('--gen_txt_file', type=str,
                         help="Txt file containing a model-generated example per line, corresponding with src_txt_file")
-    parser.add_argument('--gen-qst-file', type=str,
+    parser.add_argument('--gen_qst_file', type=str,
                         help="Txt file containing a gen-conditioned question per line, in the same order as {src/gen}_txt_file")
-    parser.add_argument('--gen-prob-file', type=str, default=None,
+    parser.add_argument('--gen_prob_file', type=str, default=None,
                         help="Txt file containing probabilities of each question in gen_qst_file according to the QG model")
-    parser.add_argument('--gen-ans-file', type=str, default=None,
+    parser.add_argument('--gen_ans_file', type=str, default=None,
                         help="Txt file containing expected answers of each question in gen_qst_file")
-    parser.add_argument('--gen-prd-file', type=str, default=None,
+    parser.add_argument('--gen_prd_file', type=str, default=None,
                         help="Txt file containing predictions of QA model on questions in gen_qst_file")
-    parser.add_argument('--n-ans-per-doc', type=int, default=10, help="Number of answer candidates per example")
-    parser.add_argument('--n-gen-qsts', type=int, default=10, \
+    parser.add_argument('--n_ans_per_doc', type=int, default=10, help="Number of answer candidates per example")
+    parser.add_argument('--n_gen_qsts', type=int, default=10, \
             help="Number of generated questions per (example, answer candidate) pair")
-    parser.add_argument('--n-qsts-per-doc', type=int, default=5, \
+    parser.add_argument('--n_qsts_per_doc', type=int, default=5, \
             help="Number of questions to use per example, filtered down from n_ans_per_doc * n_gen_qsts")
-    parser.add_argument('--use-all-qsts', action='store_true')
-    parser.add_argument('--use-act-anss', action='store_true')
-    parser.add_argument('--use-exp-anss', action='store_true')
+    parser.add_argument('--use_all_qsts', action='store_true')
+    parser.add_argument('--use_act_anss', action='store_true')
+    parser.add_argument('--use_exp_anss', action='store_true')
 
-    parser.add_argument('--source-ans-file', type=str)
-    parser.add_argument('--target-ans-file', type=str)
-    parser.add_argument('--ans-similarity-fn', choices=["em", "f1"], default="f1")
+    parser.add_argument('--source_ans_file', type=str)
+    parser.add_argument('--target_ans_file', type=str)
+    parser.add_argument('--ans_similarity_fn', choices=["em", "f1"], default="f1")
     args = parser.parse_args()
 
 

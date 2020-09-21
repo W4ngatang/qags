@@ -1,38 +1,12 @@
 """  """
 import os
-import re
 import sys
-import ast
-import time
 import json
-import copy
 import random
 import argparse
-import itertools
-from tqdm import tqdm
-from datetime import datetime
-from functools import lru_cache
 from collections import defaultdict, Counter
 
-import numpy as np
-import pandas as pd
 import spacy
-from nltk.tokenize import sent_tokenize
-from nltk import agreement
-try:
-    from nlgeval import compute_metrics, NLGEval
-except ModuleNotFoundError as e:
-    print("Unable to import NLGEval library!")
-try:
-    from bert_score import score as bert_score
-except ModuleNotFoundError as e:
-    print("Unable to import BERT Score!")
-try:
-    import krippendorff
-except ModuleNotFoundError as e:
-    print("Unable to import Krippendorff!")
-from scipy.stats import pearsonr, spearmanr
-import rouge
 from transformers import GPT2Tokenizer
 
 from utils import write_data, write_jsonl, write_txt, \
@@ -55,9 +29,6 @@ def extract_ans(txts):
             - adjectives within noun chunks
             - nouns w/ dependencies that are proper nouns, roughly nouns modifying proper nouns
             - if the head of a noun chunk if a verb, the entire noun chunk ?
-        - for each conjunction,
-            - the subtree of the head
-            - the subtree of the children
     """
     nlp = get_spacy_nlp("en_core_web_lg")
     all_ans = list()
@@ -65,37 +36,9 @@ def extract_ans(txts):
         ans = list()
         for ent in doc.ents:
             ans.append(ent.text)
-            #if not (len(ent) == 1 and ent[0].pos_ in ['PRON']):
-            #    ans.append(ent.text)
-            #if ent.label_ in ['PERSON']:
-            #    for tok in ent:
-            #        ans.append(tok.text)
         for chunk in doc.noun_chunks:
             ans.append(chunk.text)
-            #if not (len(chunk) == 2 and chunk[0].pos_ in ['PRON']):
-            #    ans.append(chunk.text)
-            #for tok in chunk:
-            #    if tok.pos_ in ['ADJ']:
-            #        ans.append(tok.text)
-
-            #    if tok.pos_ in ['NOUN'] and tok.head.pos_ in ['PROPN']:
-            #        ans.append(tok.text)
-
-            #    if tok.head.pos_ in ['VERB']:
-            #        ans.append(' '.join([t.text for t in tok.head.subtree]))
-
-        #specials = [t for t in doc if t.pos_ in ['SCONJ'] or t.tag_ in ['IN']]
-        #for special in specials:
-        #    ans.append(' '.join([t.text for t in special.head.subtree]))
-        #    # subtrees of conjunctions
-        #    for child in special.children:
-        #        if child.is_punct or child.is_quote:
-        #            continue
-        #        ans.append(' '.join([t.text for t in child.subtree]))
-
         ans = list(set(ans))
-        #ans = sorted(ans, key=lambda x: len(x))
-        #ipdb.set_trace()
         all_ans.append(ans)
     return all_ans
 
@@ -174,10 +117,6 @@ def prepare_ans_conditional_data(data_file,
 
 def extract_gen_from_fseq_log(data_file, out_dir):
     """ """
-    """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
-    from fseq logs and write each as a text file, one text per line.
-    """
-    #data_file = "/checkpoint/wangalexc/fairseq/08-11-2019/qst.src-subset.cnndm.test.txt"
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     data = parse_generation(data_file)
@@ -192,28 +131,11 @@ def extract_gen_from_fseq_log(data_file, out_dir):
             tok_str = raw.replace('<s>', '').replace('<mask>', '').strip().split()
             tok_ids = [int(t) for t in tok_str]
             gen = tokenizer.decode(tok_ids)
-            gen_fh.write('{gen}\n')
-            prob_fh.write('{prob}\n')
+            gen_fh.write(f'{gen}\n')
+            prob_fh.write(f'{prob}\n')
             n_gens += 1
 
     print(f'Wrote {n_gens} generations to {out_dir}')
-
-
-    #for txt_type in ["src", "gen", "trg"]:
-    #    txts = [d[txt_type] for d in data.values() if len(d['gen']) > 0]
-    #    if append_tags:
-    #        if txt_type in ["src", "trg"]:
-    #            txts = [f"<t> {txt} </t>" for txt in txts]
-    #        else:
-    #            txts = [[f"<t> {hyp[0]} </t>"] for hyps in txts for hyp in hyps]
-
-    #    if txt_type == "gen":
-    #        txts = [t[0] for t in txts]
-
-        #out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
-        #out_file = f"{out_dir}/{txt_type}.txt"
-        #write_txt(txts, out_file)
-        #print(f"Wrote {len(txts)} texts to {out_file}")
 
 
 def main(arguments):

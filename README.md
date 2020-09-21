@@ -24,7 +24,11 @@ The script will produce `test.txt`, `test_{n_ans_per_txt}.txt`, `test_w_{n_ans_p
 in `out_dir`, which respectively contain the examples, the extracted answers, and the answers and examples formatted to
 feed into the QG model.
 
-```python qg_utils.py --command extract_ans --data_file ${data_file} --out_dir ${out_dir}```
+```
+python qg_utils.py --command extract_ans \
+                   --data_file ${data_file} \
+                   --out_dir ${out_dir}
+```
 
 
 #### Generating questions
@@ -48,10 +52,12 @@ Due to a code quirk, in `fairseq/fairseq/models/summerization_encoder_only.py`, 
 Finally, extract the generated questions using 
 
 ```
-python qg_utils.py --command extract-gen --data_file ${fseq_log_file} --out_dir ${out_dir}
+python qg_utils.py --command extract-gen \
+                   --data_file ${fseq_log_file} \
+                   --out_dir ${out_dir}
 ```
 
-which will extract the generations and the corresponding probabilities respectively to `gen.txt` and `prob.txt` in `${out_dir}`.
+which will extract the generations and the corresponding probabilities respectively to `gen.txt` and `prob.txt` in `out_dir`.
 
 
 ### 2. Answering Questions
@@ -59,22 +65,22 @@ which will extract the generations and the corresponding probabilities respectiv
 To prepare the QA data, use the following command: 
 
 ```
-python qa_utils.py --command format-qa-data --out-dir tmp \
-                   --src-txt-file ${src_txt_file} --gen-txt-file ${gen_txt_file} \
-                   --gen-qst-file ${gen_qst_file} --gen-prob-file ${gen_prob_file} 
+python qa_utils.py --command format-qa-data --out_dir tmp \
+                   --src_txt_file ${src_txt_file} --gen_txt_file ${gen_txt_file} \
+                   --gen_qst_file ${gen_qst_file} --gen_prob_file ${gen_prob_file} 
 ```
 
 where `gen_{qst/prob}_file` are generated from the previous step (`gen.txt` and `prob.txt`).
-`{src/gen}-txt-file` are respectively the source and model-generated texts 
+`{src/gen}_txt_file` are respectively the source and model-generated texts 
 (e.g. for summarization, the source articles and model-generated summaries to be evaluated).
 As part of this step, we filter questions by quality using a number of heuristics.
 Most importantly, we filter questions by enforcing answer consistency: 
 We use a QA model to answer the generated questions, and if the predicted answer doesn't match the original answer, we throw out the question.
 To do this, we need to run the QA model on the generated questions, which will produce an answer file.
-For this step, use the flag `--use-all-qsts` and then run the QA model on the resulting data file.
+For this step, use the flag `--use_all_qsts` and then run the QA model on the resulting data file.
 
 Once you have answers for each question, we need to compare the expected and predicted answers, 
-which we do so  via the flags `--use-exp-anss --gen-ans-file ${gen_ans_file} --gen-prd-file ${gen_prd_file}`,
+which we do so  via the flags `--use_exp_anss --gen_ans_file ${gen_ans_file} --gen_prd_file ${gen_prd_file}`,
 where the latter two respectively contain the expected and the predicted answers.
 
 To evaluate our QA models, use the following command to evaluate the model on `pred_file` and write the predictions to `out_dir/out_file`
