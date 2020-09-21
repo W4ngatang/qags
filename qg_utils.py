@@ -1,7 +1,7 @@
 """  """
-
 import os
 import re
+import sys
 import ast
 import time
 import json
@@ -33,12 +33,12 @@ except ModuleNotFoundError as e:
     print("Unable to import Krippendorff!")
 from scipy.stats import pearsonr, spearmanr
 import rouge
+from transformers import GPT2Tokenizer
 
 from utils import write_data, write_jsonl, write_txt, \
                   process, print_samples, format_squad, \
                   filter_line_fseq, parse_generation, \
                   load_txt, load_json
-from eval_ppb_answers import evaluate, load_data, align_ans, count_noans
 
 
 ANS_TOK = "[ANS]"
@@ -177,39 +177,54 @@ def extract_gen_from_fseq_log(data_file, out_dir):
     """ Extract source ('S'), target ('T'), and hypothesis generations ('H')
     from fseq logs and write each as a text file, one text per line.
     """
-    data_file = "/checkpoint/wangalexc/fairseq/08-11-2019/qst.src-subset.cnndm.test.txt"
+    #data_file = "/checkpoint/wangalexc/fairseq/08-11-2019/qst.src-subset.cnndm.test.txt"
 
-    append_tags = False
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     data = parse_generation(data_file)
 
-    for txt_type in ["src", "gen", "trg"]:
-        txts = [d[txt_type] for d in data.values() if len(d['gen']) > 0]
-        if append_tags:
-            if txt_type in ["src", "trg"]:
-                txts = [f"<t> {txt} </t>" for txt in txts]
-            else:
-                txts = [[f"<t> {hyp[0]} </t>"] for hyps in txts for hyp in hyps]
+    n_gens = 0
+    gen_fh = open(f'{out_dir}/gens.txt', 'w')
+    prob_fh = open(f'{out_dir}/probs.txt', 'w')
+    ex_ids = sorted(list(data.keys()))
+    for ex_id in ex_ids:
+        ex_gens = data[ex_id]['gen']
+        for raw, prob in ex_gens:
+            tok_str = raw.replace('<s>', '').replace('<mask>', '').strip().split()
+            tok_ids = [int(t) for t in tok_str]
+            gen = tokenizer.decode(tok_ids)
+            gen_fh.write('{gen}\n')
+            prob_fh.write('{prob}\n')
+            n_gens += 1
 
-        if txt_type == "gen":
-            txts = [t[0] for t in txts]
+    print(f'Wrote {n_gens} generations to {out_dir}')
+
+
+    #for txt_type in ["src", "gen", "trg"]:
+    #    txts = [d[txt_type] for d in data.values() if len(d['gen']) > 0]
+    #    if append_tags:
+    #        if txt_type in ["src", "trg"]:
+    #            txts = [f"<t> {txt} </t>" for txt in txts]
+    #        else:
+    #            txts = [[f"<t> {hyp[0]} </t>"] for hyps in txts for hyp in hyps]
+
+    #    if txt_type == "gen":
+    #        txts = [t[0] for t in txts]
 
         #out_file = f"/private/home/wangalexc/projects/qags/data/{txt_type}.txt"
-        out_file = f"{out_dir}/{txt_type}.txt"
-        write_txt(txts, out_file)
-        print(f"Wrote {len(txts)} texts to {out_file}")
-
-
+        #out_file = f"{out_dir}/{txt_type}.txt"
+        #write_txt(txts, out_file)
+        #print(f"Wrote {len(txts)} texts to {out_file}")
 
 
 def main(arguments):
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--command", choices=["extract_ans", "extract_gen", "filter_qsts"], description="Function to perform")
-    parser.add_argument("--data_file", type=str, description="File from which to extract answers or filter questions. For `extract_ans`, this should be a text file with an example per line.")
-    parser.add_argument("--out_dir", type=str, description="Directory to write outputs")
-    parser.add_argument("--out_prefix", type=str, default="test", description="Prefix for files written out")
+    parser.add_argument("--command", choices=["extract_ans", "extract_gen"], help="Function to perform")
+    parser.add_argument("--data_file", type=str, help="File from which to extract answers or filter questions. For `extract_ans`, this should be a text file with an example per line.")
+    parser.add_argument("--out_dir", type=str, help="Directory to write outputs")
+    parser.add_argument("--out_prefix", type=str, default="test", help="Prefix for files written out")
 
     # answer extraction options
-    parser.add_argument("--n_ans", type=int, default=10, description="Number of answer candidates per example")
+    parser.add_argument("--n_ans", type=int, default=10, help="Number of answer candidates per example")
 
     args = parser.parse_args(arguments)
 
@@ -217,7 +232,7 @@ def main(arguments):
         prepare_ans_conditional_data(args.data_file, args.out_dir, args.out_prefix,
                                      n_ans_per_txt=args.n_ans)
     elif args.command == "extract_gen":
-        extract_gen_from_fseq_log()
+        extract_gen_from_fseq_log(args.data_file, args.out_dir)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

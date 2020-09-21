@@ -45,7 +45,13 @@ Change `model_path` to point to the pretrained QG checkpoint,
 and `out_file` for the file to log to.
 Due to a code quirk, in `fairseq/fairseq/models/summerization_encoder_only.py`, set `HACK_PATH` (line 107) to the `best_pretrained_bert.pt` checkpoint.
 
-Finally, extract the generated questions using `python qg_utils.py --command extract-qst` (TODO(Alex)).
+Finally, extract the generated questions using 
+
+```
+python qg_utils.py --command extract-gen --data_file ${fseq_log_file} --out_dir ${out_dir}
+```
+
+which will extract the generations and the corresponding probabilities respectively to `gen.txt` and `prob.txt` in `${out_dir}`.
 
 
 ### 2. Answering Questions
@@ -55,10 +61,12 @@ To prepare the QA data, use the following command:
 ```
 python qa_utils.py --command format-qa-data --out-dir tmp \
                    --src-txt-file ${src_txt_file} --gen-txt-file ${gen_txt_file} \
-                   --src-qst-file ${src_qst_file} --gen-qst-file ${gen_qst_file} \
-                   --src-prob-file ${src_prob_file} --gen-prob-file ${gen_prob_file} 
+                   --gen-qst-file ${gen_qst_file} --gen-prob-file ${gen_prob_file} 
 ```
 
+where `gen_{qst/prob}_file` are generated from the previous step (`gen.txt` and `prob.txt`).
+`{src/gen}-txt-file` are respectively the source and model-generated texts 
+(e.g. for summarization, the source articles and model-generated summaries to be evaluated).
 As part of this step, we filter questions by quality using a number of heuristics.
 Most importantly, we filter questions by enforcing answer consistency: 
 We use a QA model to answer the generated questions, and if the predicted answer doesn't match the original answer, we throw out the question.
