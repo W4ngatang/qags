@@ -43,7 +43,7 @@ In the script, make sure to change `dat_dir` to point to the directory containin
 The script expects `dat_dir` to contain `test.src` and `test.trg`, where `test.src` are the files that will actually 
 be fed into the QG model to generate from; `test.trg` can be a dummy file with the same number of lines (e.g., a copy of `test.src`).
 
-Then to generate, use command `./scripts/aw/gen_sum.sh`. 
+Then to generate, use command `./scripts/gen_qg.sh`. 
 Change `model_path` to point to the pretrained QG checkpoint,
 `data_path` to the directory containing the processed data (typically the `processed` directory created during preprocessing),
 and `out_file` for the file to log to.
