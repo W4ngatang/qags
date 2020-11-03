@@ -47,7 +47,7 @@ Then to generate, use command `./scripts/gen_qg.sh`.
 Change `model_path` to point to the pretrained QG checkpoint,
 `data_path` to the directory containing the processed data (typically the `processed` directory created during preprocessing),
 and `out_file` for the file to log to.
-Due to a code quirk, in `fairseq/fairseq/models/summerization_encoder_only.py`, set `HACK_PATH` (line 107) to the `best_pretrained_bert.pt` checkpoint.
+Due to a code quirk, in `fairseq/fairseq/models/summerization_encoder_only.py`, set `HACK_PATH` (line 107) to the `best_pretrained_bert.pt` checkpoint, located [here](https://drive.google.com/drive/folders/1GP75Jp1XuPnfidhMtc1ey_-zjFKDxUoh?usp=sharing).
 
 Finally, extract the generated questions using 
 
