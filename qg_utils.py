@@ -30,7 +30,7 @@ def extract_ans(txts):
             - nouns w/ dependencies that are proper nouns, roughly nouns modifying proper nouns
             - if the head of a noun chunk if a verb, the entire noun chunk ?
     """
-    nlp = get_spacy_nlp("en_core_web_lg")
+    nlp = spacy.load("en_core_web_lg")
     all_ans = list()
     for doc in nlp.pipe(txts, disable=[]):
         ans = list()
