@@ -35,7 +35,7 @@ python qg_utils.py --command extract_ans \
 
 To generate the questions, we rely on [BART](https://arxiv.org/abs/1910.13461) finetuned on [NewsQA](https://arxiv.org/abs/1611.09830), implemented in [`fairseq`](https://github.com/pytorch/fairseq).
 A frozen version of `fairseq` for doing so is available in [`qags/fairseq`](https://github.com/W4ngatang/qags/fairseq).
-Our pretrained QG model is available [here](https://drive.google.com/drive/folders/1GP75Jp1XuPnfidhMtc1ey_-zjFKDxUoh?usp=sharing).
+Our pretrained QG model is available [here](https://www.dropbox.com/sh/ocke4c2zmrv8r7x/AAAiTmUS1yxYUJYDE5WBSiFia?dl=0).
 
 To generate from these models, we must first preprocess the data (tokenize and binarize) using the command:
 `./fairseq/scripts/aw/preprocess.sh preprocess`.
@@ -47,7 +47,7 @@ Then to generate, use command `./scripts/gen_qg.sh`.
 Change `model_path` to point to the pretrained QG checkpoint,
 `data_path` to the directory containing the processed data (typically the `processed` directory created during preprocessing),
 and `out_file` for the file to log to.
-Due to a code quirk, in `fairseq/fairseq/models/summerization_encoder_only.py`, set `HACK_PATH` (line 107) to the `best_pretrained_bert.pt` checkpoint, located [here](https://drive.google.com/drive/folders/1GP75Jp1XuPnfidhMtc1ey_-zjFKDxUoh?usp=sharing).
+Due to a code quirk, in `fairseq/fairseq/models/summerization_encoder_only.py`, set `HACK_PATH` (line 107) to the `best_pretrained_bert.pt` checkpoint, located [here](https://www.dropbox.com/sh/ocke4c2zmrv8r7x/AAAiTmUS1yxYUJYDE5WBSiFia?dl=0).
 
 Finally, extract the generated questions using 
 
@@ -84,7 +84,7 @@ which we do so  via the flags `--use_exp_anss --gen_ans_file ${gen_ans_file} --g
 where the latter two respectively contain the expected and the predicted answers.
 
 To evaluate our QA models, use the following command to evaluate the model on `pred_file` and write the predictions to `out_dir/out_file`
-Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](https://drive.google.com/drive/folders/1GP75Jp1XuPnfidhMtc1ey_-zjFKDxUoh?usp=sharing).
+Our models are based on `pytorch-pretrained-BERT` (now `transformers`) and pretrained checkpoints are located [here](https://www.dropbox.com/sh/ocke4c2zmrv8r7x/AAAiTmUS1yxYUJYDE5WBSiFia?dl=0).
 Make sure `model_dir` points to the QA model directory.
 To compute QAGS scores, evaluate the QA model using the both the article as context and the summary as context, so you will need to run this command twice.
 
